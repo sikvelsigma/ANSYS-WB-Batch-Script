@@ -1,9 +1,11 @@
 # ANSYS WB Batch Script
 This is a collection of python scripts I made to make my life easier when dealing with ANSYS Workbench Batch mode. Right now there are 4 modules:
+
 1. *WBInterface.py*
 2. *Logger.py*
 3. *ExcelFileReader.py*
 4. *CSVTable.py*
+
 Ansys Workbench comes with IronPython so to run it from batch mode we only need to write a python script, which will control the flow of our project (*run_script.py* as an example here) and a .bat file (*run2.bat* as an example here).
 
 - Module *WBInterface.py* is the main module which contains a class with all the useful workbench commands. I tried to document it as much as I could. This module is absolutely essential to have.
