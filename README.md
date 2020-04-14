@@ -1,4 +1,4 @@
-# ANSYS Workbench - Batch Script Interface
+# ANSYS Workbench - Batch Mode - Python Interface
 This is a collection of python scripts I made to make my life easier when dealing with ANSYS Workbench Batch mode. It requres no additional python packages whatsoever. Right now there are 4 modules:
 
 1. *WBInterface.py*
