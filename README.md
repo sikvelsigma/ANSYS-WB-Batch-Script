@@ -12,7 +12,7 @@ Ansys Workbench comes with IronPython so to run it from batch mode we only need 
 
 - Module *Logger.py* contains a class which will create a log file in our project directory and write the flow of our project to it. This module is absolutely essential to have.
 
-- Module *ExcelFileReader.py* is an adapter class to the COM excel interaction. Can be used to read tables from excel files. Not essential.
+- Module *ExcelFileReader.py* is an adapter class to the COM Excel API. Can be used to read tables from excel files. Not essential. This module can also be used as a stand-alone with IronPython to read data from Excel.
 
 - Module *CSVTable.py* lets us easily import csv file to a list/dict. Not essential.
 
