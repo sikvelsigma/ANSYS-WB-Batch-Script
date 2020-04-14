@@ -50,6 +50,6 @@ This will generate 3 DPs in our project with 3 input parameters.
 
 By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all customizable.
 
-You can also use *CSVTable.py* module (or just regular **open()**) to read parameters into a list or dict and use **input_by_name()** or **input_by_DPs** methods of *WBInterface.py* to set them directly.
+You can also use *CSVTable.py* module or just regular **open()** to read parameters into a list or dict and use **input_by_name()** or **input_by_DPs()** methods of *WBInterface.py* to set them directly.
 
 Note that I'm not a programmer and I apologize in advance for any inconsistencies/bad practises in my code.
