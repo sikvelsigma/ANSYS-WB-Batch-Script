@@ -39,6 +39,6 @@ Example of the *.input* file:
   500,52,26
 ```
 
-By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all custimizable.
+By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all customizable.
 
 Note that I'm not a programmer and I apologize in advance for any inconsistencies/bad practises in my code.
