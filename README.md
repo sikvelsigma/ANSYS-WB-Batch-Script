@@ -21,8 +21,11 @@ First of all, this was all made with running it on a remote machine in mind, whe
 So, the simplest way to use all of this would be:
 
 1. Drop modules *WBInterface.py* and *Logger.py* into the same folder where your ANSYS WB archive/project currently resides
-2. Drop *run_script.py* and *run2.bat* there also.
-3. Configure *.bat* file for your machine and run it. 
+2. Drop *run_script.py* and *run2.bat* there also
+3. Configure *.bat* file for your machine and run it; format of *.bat* file:
+
+        "<ansysdir>\v<ver>\Framework\bin\Win64\RunWB2.exe" -B -R "run_script.py"
+
 
 That's it! Easy and simple as I intended. The script will automatically try to find *.wbpz* file and open it or, failing that, it will try to find a *.wbpj* file. After the project was opened, the script will try to issue a global Update command for all DPs (Design Points) present in the project. 
 Note: You don't need to delete anything from *run_script.py* since methods won't raise errors if they don't find anything, but it will be logged to a log file.
