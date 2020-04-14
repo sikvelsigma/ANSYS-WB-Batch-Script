@@ -21,8 +21,8 @@ First of all, this is all made with running it on a remote machine in mind, when
 So, the simplest way to use all of this would be to drop all the files in the same folder were your ANSYS WB archive/project currently resides, configure .bat file for your machine and run it. The script will automatically try to find *.wbpz* file and open it. Failing that it will try to find a *.wbpj* file. After the project is opened, it will try to issue a global Update command for all DPs (Design Points) present.
 
 You can also input/output WB parameters with multiple DPs which will managed automatically. All you need to do is to create 2 csv files:
-1. *.control* or *_control.csv*
-2. *.input* or *_input.csv*
+- *.control* or *_control.csv*
+- *.input* or *_input.csv*
 The first one contain a list of parameters to input and a list of parameters to output. The second one contains values of input parameters with each row being a new DP. Both files support comments (with #).
 Example of the *.control* file:
 ```
