@@ -27,8 +27,10 @@ That's it! Easy and simple as I intended. The script will automatically try to f
 
 ## Additional functionality
 You can also input/output WB parameters with multiple DPs which will managed automatically. All you need to do is to create 2 csv files:
+
 - *.control* or *_control.csv*
 - *.input* or *_input.csv*
+
 The first one contain a list of parameters to input and a list of parameters to output. The second one contains values of input parameters with each row being a new DP. Both files support comments (with #).
 Example of the *.control* file:
 ```
