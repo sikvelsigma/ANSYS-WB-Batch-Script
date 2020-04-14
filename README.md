@@ -6,7 +6,7 @@ This is a collection of python scripts I made to make my life easier when dealin
 3. *ExcelFileReader.py*
 4. *CSVTable.py*
 
-Ansys Workbench comes with IronPython so to run it from batch mode we only need to write a python script, which will control the flow of our project (*run_script.py* as an example here) and a .bat file (*run2.bat* as an example here).
+Ansys Workbench comes with IronPython so to run it from batch mode we only need to write a python script, which will control the flow of our project (*run_script.py* as an example here) and a *.bat* file (*run2.bat* as an example here).
 
 - Module *WBInterface.py* is the main module which contains a class with all the useful workbench commands. I tried to document it as much as I could. This module is absolutely essential to have.
 
@@ -41,4 +41,4 @@ Example of the *.input* file:
 
 By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all custimizable.
 
-Note that I'm not a programmer and I apologies in advance for any inconsistencies/bad practises in my code.
+Note that I'm not a programmer and I apologize in advance for any inconsistencies/bad practises in my code.
