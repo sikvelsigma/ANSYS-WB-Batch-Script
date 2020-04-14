@@ -18,8 +18,14 @@ Ansys Workbench comes with IronPython so to run it from batch mode we only need 
 
 ## How to use 
 First of all, this is all made with running it on a remote machine in mind, when you don't have an ability to install additional software or open apps, but have access to a file system. Second of all, in my work I use a specialised hierarchical software which does not support making changes to already existing files, so there is a need to be able to import modules by their modified names (like *WBInterface_100.py* for example). That is why there is this weird system with **exac()** commands implemented to input all those modules. 
-So, the simplest way to use all of this would be to drop all the files in the same folder were your ANSYS WB archive/project currently resides, configure .bat file for your machine and run it. The script will automatically try to find *.wbpz* file and open it. Failing that it will try to find a *.wbpj* file. After the project is opened, it will try to issue a global Update command for all DPs (Design Points) present.
+So, the simplest way to use all of this would be:
 
+1. Drop all the files in the same folder where your ANSYS WB archive/project currently resides
+2. Configure *.bat* file for your machine and run it. 
+
+That's it! Easy and simple as I intended. The script will automatically try to find *.wbpz* file and open it. Failing that it will try to find a *.wbpj* file. After the project is opened, it will try to issue a global Update command for all DPs (Design Points) present. You don't need to delete methods that try to input parameters since they won't raise an error if they don't find anything, but it will be logged to a log file.
+
+## Additional functionality
 You can also input/output WB parameters with multiple DPs which will managed automatically. All you need to do is to create 2 csv files:
 - *.control* or *_control.csv*
 - *.input* or *_input.csv*
@@ -38,7 +44,10 @@ Example of the *.input* file:
   499,49,24
   500,52,26
 ```
+This will generate 3 DPs in our project with 3 input parameters.
 
 By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all customizable.
+
+You can also use *CSVTable.py* module (or just regular **open()**) to read parameters into a list or dict and use **input_by_name()** or **input_by_DPs** methods of *WBInterface.py* to set them directly.
 
 Note that I'm not a programmer and I apologize in advance for any inconsistencies/bad practises in my code.
