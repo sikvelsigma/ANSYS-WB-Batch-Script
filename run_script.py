@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """ Script by Toybich Egor
 """
-#__________________________________________________________
-#__________________________________________________________
-from glob import glob 
 import sys
-import platform
 import os
+from glob import glob 
 
+# Dynamically import all the modules from working directory
 def find_module(st_in):
 	res = []
 	stlist = st_in if isinstance(st_in, list) else [st_in]
@@ -38,10 +36,12 @@ if modules_files[3]: exec('import {} as CSVTable'.format(modules_files[3]))
 #__________________________________________________________
 
 if __name__ == '__main__':
-#__________________________________________________________
 
+	# Main class to interact with ANSYS
 	wb = WBInterface()
 
+	# Firstly, try to open archive, then project file in cd
+	# method wb.log() is used to write to a log file
 	try:
 		wb.open_archive()
 	except:
@@ -52,11 +52,11 @@ if __name__ == '__main__':
 			raise
 
 	try:
-		wb.read_control()
-		wb.read_input()
-		wb.set_parameters()
-		wb.update_project()
-		wb.output_parameters()
+		wb.read_control()			# read .control file if exists
+		wb.read_input()				# read .input file if exists
+		wb.set_parameters()			# set parameters in Workbench project
+		wb.update_project()			# update Workbench project (auto-saved after)
+		wb.output_parameters()		# output parameters (auto-saved after)
 	except Exception as err_msg:
 		wb.log('CRITICAL ERROR')
 		wb.log(err_msg)
