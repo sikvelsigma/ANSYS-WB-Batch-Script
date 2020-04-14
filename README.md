@@ -6,24 +6,26 @@ This is a collection of python scripts I made to make my life easier when dealin
 3. *ExcelFileReader.py*
 4. *CSVTable.py*
 
-Ansys Workbench comes with IronPython so to run it from batch mode we only need to write a python script, which will control the flow of our project (*run_script.py* as an example here) and a *.bat* file (*run2.bat* as an example here).
+Ansys Workbench comes with IronPython 2.7 so to run it from batch mode we only need to write a python script, which will control the flow of the project (*run_script.py* as an example here) and a *.bat* file (*run2.bat* as an example here).
 
 - Module *WBInterface.py* is the main module which contains a class with all the useful workbench commands. I tried to document it as much as I could. This module is absolutely essential to have.
 
-- Module *Logger.py* contains a class which will create a log file in our project directory and write the flow of our project to it. This module is absolutely essential to have.
+- Module *Logger.py* contains a class which will create a log file in the project directory and write the flow of the project to it. This module is absolutely essential to have.
 
-- Module *ExcelFileReader.py* is an adapter class to the COM Excel API. Can be used to read tables from excel files. Not essential. This module can also be used as a stand-alone with IronPython to read data from Excel. You have to have Excel installed on your machine.
+- Module *ExcelFileReader.py* is an adapter class to the COM Excel API. Can be used to read tables from excel files. This module can also be used as a stand-alone with IronPython to read data from Excel. You have to have Excel installed on your machine. Not essential
 
 - Module *CSVTable.py* lets us easily import csv file to a list/dict. Not essential.
 
 ## How to use 
-First of all, this is all made with running it on a remote machine in mind, when you don't have an ability to install additional software or open apps, but have access to a file system. Second of all, in my work I use a specialised hierarchical software which does not support making changes to already existing files, so there is a need to be able to import modules by their modified names (like *WBInterface_100.py* for example). That is why there is this weird system with **exac()** commands implemented to input all those modules. 
+First of all, this was all made with running it on a remote machine in mind, when you don't have an ability to install additional software or open apps, but have access to a file system. Second of all, in my work I use a specialised hierarchical software which does not support making changes to already existing files, so there was a need to be able to import modules by their modified names (like *WBInterface_100.py* for example). That's why there's this weird system with **exac()** commands implemented to input everything correctly. 
 So, the simplest way to use all of this would be:
 
-1. Drop all the files in the same folder where your ANSYS WB archive/project currently resides
-2. Configure *.bat* file for your machine and run it. 
+1. Drop modules *WBInterface.py* and *Logger.py* into the same folder where your ANSYS WB archive/project currently resides
+2. Drop *run_script.py* and *run2.bat* there also.
+3. Configure *.bat* file for your machine and run it. 
 
-That's it! Easy and simple as I intended. The script will automatically try to find *.wbpz* file and open it. Failing that it will try to find a *.wbpj* file. After the project is opened, it will try to issue a global Update command for all DPs (Design Points) present. You don't need to delete methods that try to input parameters since they won't raise an error if they don't find anything, but it will be logged to a log file.
+That's it! Easy and simple as I intended. The script will automatically try to find *.wbpz* file and open it or, failing that, it will try to find a *.wbpj* file. After the project was opened, the script will try to issue a global Update command for all DPs (Design Points) present in the project. 
+Note: You don't need to delete anything from *run_script.py* since methods won't raise errors if they don't find anything, but it will be logged to a log file.
 
 ## Additional functionality
 You can also input/output WB parameters with multiple DPs which will managed automatically. All you need to do is to create 2 csv files:
