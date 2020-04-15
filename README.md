@@ -1,4 +1,4 @@
-# ANSYS Workbench - Batch Mode - Python Interface
+# ANSYS Workbench - Batch Mode - Python Scripts
 
 **Platform** - Tested on Windows 7, 10
 
