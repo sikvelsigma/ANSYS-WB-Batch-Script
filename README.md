@@ -1,4 +1,9 @@
 # ANSYS Workbench - Batch Mode - Python Interface
+
+**Platform** - Tested on Windows 7, 10
+
+**ANSYS Version** - Tested on 19.x; will most likely work on other versions that are not too old
+
 This is a collection of python scripts I made to make my life easier when dealing with ANSYS Workbench Batch mode. It requres no additional python packages whatsoever. Right now there are 4 modules:
 
 1. *WBInterface.py*
@@ -37,21 +42,21 @@ You can also input/output WB parameters with multiple DPs which will managed aut
 - *.input* or *_input.csv*
 
 The first one contain a list of parameters to input and a list of parameters to output. The second one contains values of input parameters with each row being a new DP. Both files support comments (with #).
-Example of the *.control* file:
+Example of a *.control* file:
 ```
   #Input parameters (type 'no' if no inputs)
   P1,P2,P3
   #Output parameters (type 'no' if no outputs)
   P4,P5
 ```
-Example of the *.input* file:
+Example of an *.input* file:
 ```
   # p1,p2,p3
   501,50,25
   499,49,24
   500,52,26
 ```
-This will generate 3 DPs in our project with 3 input parameters.
+This will generate 3 DPs in our project with 3 input and 2 output parameters.
 
 By default in the project directory a *log.txt* file will be created. Output is written to an *output.txt* file csv-style and Workbench parametric report is saved to a *full_report.txt* file. Of course this is all customizable.
 
