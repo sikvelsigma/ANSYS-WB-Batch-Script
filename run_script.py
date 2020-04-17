@@ -26,7 +26,7 @@ def find_module(st_in):
 modules = ['WBInterface', 'ExcelFileReader', 'Logger', 'CSVTable']
 modules_files = find_module(modules)
 
-print('Using: {}, {}, {}, {}'.format(*modules))
+print('Using: {}, {}, {}, {}'.format(*modules_files))
 
 if modules_files[0]: exec('from {} import WBInterface'.format(modules_files[0]))
 if modules_files[1]: exec('from {} import ExcelFileReader'.format(modules_files[1]))
