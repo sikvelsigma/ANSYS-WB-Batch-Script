@@ -2,6 +2,10 @@
 """ Script by Toybich Egor
 Note: Workbench uses IronPython (Python 2.7)!
 """
+#__________________________________________________________
+#__________________________________________________________
+# import os
+# import csv
 from glob import glob
 from functools import partial 
 from collections import defaultdict
@@ -281,9 +285,9 @@ class WBInterface(object):
 		if not self.is_matrix(inp):
 			self._log_('Incorrect input format!')
 			raise ValueError('Incorrect input format!')
-			
+		
 		if isinstance(inp, list):
-			if len(self._param_in) == 0:
+			if not self._param_in:
 				self._log_('No parameter keys found!')
 				raise KeysNotFound
 			self._input_list_by_name(inp)
@@ -402,7 +406,7 @@ class WBInterface(object):
 			self._log_(err_msg, 1)
 			raise
 		self._log_('Success!', 1)
-		if saveproject: self._save_project
+		if saveproject: self._save_project()
 		
 	def update_project(self, skip_error=True, skip_uncomplete=True):
 		"""Update Workbench project."""
@@ -412,7 +416,10 @@ class WBInterface(object):
 			
 		self._log_('Updating Workbench project...')
 		workbench.Parameters.ClearDesignPointsCache()
-				
+		
+		# skip_er = 'SkipDesignPoint' if skip_error else 'Stop'
+		# skip_unc = 'Continue' if skip_uncomplete else 'Stop'
+		
 		self._param_out_value = defaultdict(list)
 		
 		try:
@@ -422,6 +429,9 @@ class WBInterface(object):
 				workbench.UpdateAllDesignPoints(DesignPoints=self.__DPs,
 										     ErrorBehavior='SkipDesignPoint' if skip_error else 'Stop',
 										     CannotCompleteBehavior='Continue' if skip_uncomplete else 'Stop')
+			# system1 = GetSystem(Name="SYS")
+			# component1 = system1.GetComponent(Name="Model")
+			# component1.Update(AllDependencies=True)
 			if workbench.IsProjectUpToDate():
 				self._log_('Update successful!', 1)
 			else:
@@ -434,6 +444,25 @@ class WBInterface(object):
 			raise
 		finally:
 			self._save_project()
+	
+	def set_output(self, out_par=None):
+		"""
+		Set list of output parameters by list
+		Example: ['p1', 'p3', 'p4']
+		"""
+		self._log_('Setting output parameters...')
+		if not out_par:
+			self._log_('No output parameters specified!')
+			raise AttributeError
+			
+		self._param_out_value = defaultdict(list)
+		try:		
+			self._param_out = [par.upper() for par in out_par]
+		except Exception as err_msg:
+			self._log_('Failed to set parameters!')
+			self._log_(err_msg, 1)
+		
+		self._log_('Success: {} outputs specified'.format(len(self._param_out)), 1)
 	
 	def output_parameters(self, output_file_name=None, full_report_file=None, csv_delim=None, fkey='wb'):
 		"""
@@ -515,13 +544,13 @@ class WBInterface(object):
 		inp_str = [map(str, t) for t in inp]
 		try:
 			for key, row in zip(self._param_in, inp_str):
-				for elem in row:
+				for elem in self._listify(row):
 					self._param_in_value[key.upper()].append(elem.strip())
 		except Exception as err_msg:
 			self._log_('An error occured while processing input!')
 			self._log_(err_msg, 1)
 			raise
-		self.__DPs_imported = len(self._param_in_value[key.upper()][0])
+		self.__DPs_imported = len(self._param_in_value[key.upper()])
 		
 	def _input_dict_by_name(self, inp):
 		"""Read from dict method"""
@@ -532,13 +561,13 @@ class WBInterface(object):
 		try:
 			for key, row in inp.items():
 				self._param_in.append(key.upper())
-				for elem in row:
+				for elem in self._listify(row):
 					self._param_in_value[key.upper()].append(str(elem).strip())
 		except Exception as err_msg:
 			self._log_('An error occured while processing input!')
 			self._log_(err_msg, 1)
 			raise
-		self.__DPs_imported = len(self._param_in_value[key.upper()][0])
+		self.__DPs_imported = len(self._param_in_value[key.upper()])
 	
 	def _output_group_by_DPs(self):
 		res = [[0]*len(self._param_out_value) for x in xrange(self.__DPs_present)]
@@ -591,7 +620,8 @@ class WBInterface(object):
 			iter_list = inp.values()
 		ns_len = []
 		for row in iter_list:	
-			ns_len.append(len(row))
+			lrow = WBInterface._listify(row)
+			ns_len.append(len(lrow))
 		return ns_len
 		
 	@staticmethod
@@ -611,11 +641,19 @@ class WBInterface(object):
 			
 	@staticmethod
 	def make_dict(keys, values):
+		"""Makes dict, duh"""
 		return dict(zip(keys, values))	
+	
+	@staticmethod
+	def _listify(inp):	
+		"""Returns list of 1 items if input is not a list"""
+		return inp if isinstance(inp, list) else [inp]
 	
 	@staticmethod
 	def _get_parameter(name):
 		return workbench.Parameters.GetParameter(Name=name)	
+	
+
 		
 #__________________________________________________________
 
