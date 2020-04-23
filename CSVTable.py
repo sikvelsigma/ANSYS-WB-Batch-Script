@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
 """ Script by Toybich Egor
 """
-import csv
+__version__ = '1.0.1'
 
+import csv
+from glob import glob 
 
 def read_to_list(filename, csv_delim=','):
+	
+	try:
+		file_list = [f for f in glob(filename)]
+		file_found = file_list[0]
+	except:
+		print('File not found!')
+		raise
+		
 	try:
 		res = []
-		with open(filename, 'r') as csvfile:
+		with open(file_found, 'r') as csvfile:
 			spamreader = csv.reader(decomment(csvfile), delimiter=csv_delim)
 			for i, row in enumerate(spamreader):
 				res.append(row)
