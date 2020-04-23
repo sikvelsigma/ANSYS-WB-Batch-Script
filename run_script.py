@@ -56,6 +56,7 @@ if __name__ == '__main__':
 		wb.read_input()				# read .input file if exists
 		wb.set_parameters()			# set parameters in Workbench project
 		wb.update_project()			# update Workbench project (auto-saved after)
+		wb.runtime()
 		wb.output_parameters()		# output parameters (auto-saved after)
 	except Exception as err_msg:
 		wb.log('CRITICAL ERROR')
@@ -64,5 +65,5 @@ if __name__ == '__main__':
 		wb.log('RUN SUCCESSFUL')
 	
 	wb.log('END SCRIPT')
-
+	wb.runtime()
 

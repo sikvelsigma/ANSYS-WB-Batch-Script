@@ -2,6 +2,7 @@
 """ Script by Toybich Egor
 """
 from datetime import datetime
+from datetime import timedelta
 
 __version__ = '1.0.7'
 
@@ -52,13 +53,18 @@ class Logger(object):
 		self.__class__.__files_in_use.add(filename)
 		self.__class__.__total_instances += 1
 		self.__logger_instance = self.__class__.__total_instances
-		
+		self.__init_time = datetime.now()
 	def __repr__(self):
 		return self.__filename
 	
 	# ---------------------------------------------------------------		
 	# Public methods
 	# ---------------------------------------------------------------	
+	def runtime(self):
+		t_run = datetime.now() - self.__init_time
+		t_run = timedelta(days=t_run.days, seconds=t_run.seconds, microseconds=0)
+		self.log('Runtime: {}'.format(t_run), 1)
+	
 	def blank(self):
 		with open(self.__filename, 'a') as log_file:
 			log_file.write('\n')	

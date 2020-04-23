@@ -40,14 +40,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 #__________________________________________________________
 class WBInterface(object):
 	"""
 	A class to open Workbench project/archive, input/output parameters
 	and start calculations.
 	"""
-	__version__ = '2.0.3'
+	__version__ = '2.0.4'
 	
 	# ---------------------------------------------------------------	
 	# Public attributes
@@ -156,6 +156,12 @@ class WBInterface(object):
 		self.__input_srch_default = '*.input'		#: in-build  key string to search for input file
 		
 		self._log_('Class version: ' + self.__version__ , 1)
+		
+		try:
+			self.runtime = self._logger.runtime
+		except:
+			self.runtime = None
+			
 		
 	# ---------------------------------------------------------------		
 	# Public methods
