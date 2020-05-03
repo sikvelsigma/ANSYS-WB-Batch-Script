@@ -40,14 +40,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.0.5'
+__version__ = '2.0.7'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.0.5'
+    __version__ = '2.0.7'
     
 
     # ---------------------------------------------------------------	
@@ -552,10 +552,11 @@ class WBInterface(object):
             return
             
         self._log_('Setting number of cores to {}'.format(value), 1)
+        self._log_('Do not set this number higher than a number of physical cores on a machine!'.format(value), 1)
         
         # jscode = 'DS.Script.Configure_setNumberOfCores("{}")'.format(value)
         
-        jscode = '''
+        jsfun = '''
              function setNumberOfCores(value)
              {
                     var jobHandlerManager = DS.Script.getJobHandlerManager();
@@ -577,8 +578,10 @@ class WBInterface(object):
                     }
              }
         '''
-        jscode = jscode + 'setNumberOfCores("{}")'.format(value)
         
+        jsmain = 'setNumberOfCores("{}")'.format(value)
+        
+        jscode = jsfun + self._try_wrapper_js(jsmain)
         
         try:
             self._send_js_macro(container, jscode, module)
@@ -601,13 +604,13 @@ class WBInterface(object):
             value: boolean
             module: str; module to open
         """
-        value2 = 'true' if value else 'false'
-        if value2 == 'true':
-            self._log_('Distributed solver: active', 1)
+        value_js = self._bool_js(value)
+        if value_js == 'true':
+            self._log_('Distributed solver: Enabled', 1)
         else:
-            self._log_('Distributed solver: inactive', 1)
+            self._log_('Distributed solver: Disabled', 1)
             
-        jscode = '''
+        jsfun = '''
             function setDMP(value)
             {
                 var jobHandlerManager = DS.Script.getJobHandlerManager();
@@ -624,7 +627,9 @@ class WBInterface(object):
                 jobHandlerManager.Save();
             }
         '''
-        jscode = jscode + 'setDMP({})'.format(value2)
+        jsmain = 'setDMP({})'.format(value_js)
+        
+        jscode = jsfun + self._try_wrapper_js(jsmain)
         
         try:
             self._send_js_macro(container, jscode, module)
@@ -634,7 +639,7 @@ class WBInterface(object):
             self._log_(err_msg, 1)
     
     
-    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, module='Model'):
+    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model'):
         """
         Tested only on ANSYS2019R3!
         Saves all figures (not plot!) in fpath. 
@@ -650,36 +655,82 @@ class WBInterface(object):
         if not os.path.exists(fpath): os.mkdir(fpath)
 
         
-        jscode = '''
-            function DumpAllImages(pdir, pHeight, pWidth, pFontFactor) {
+        jsfun = '''
+            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pFit, imode){                              
+                var numObjs = activeObjs.Count;
+                var image = DS.Graphics.ImageCaptureControl;
+                
+                switch (imode) 
+                {
+                    case 0:
+                        pExt = '.png';
+                        break;
+                    case 1:
+                        pExt = '.jpg';
+                        break;
+                }
+                
+                var cntFigures = 0;
+                
+                for (var i = 1; i <= numObjs; i++) {
+                    var objActive = activeObjs.Item(i);
+
+                    if (objActive && objActive.ID && (objActive.Class == clsidObj))
+                    {
+                        DS.Graphics.Draw2(objActive.ID);
+                        
+                        if (pFit) {
+                            DS.Script.doGraphicsFit();
+                        }
+                        
+                        if (!pName) {
+                            var picEnum = ("00" + cntFigures).slice (-3);
+                            var nameParent = (objActive.Parent.Name).replace(/ |_/g, '');
+                            var nameFigure = (objActive.Name).replace(/ |_/g, '');
+                            
+                            try {
+                                var objSearch = objActive.Parent;
+                                while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
+                                var nameSolution = (objSearch.Name).replace(/ |_/g, '');
+                            } catch (err) {
+                                var nameSolution = ""
+                            }
+                            nameFull = (picEnum + "_" + nameSolution + "_" + nameParent + "_" + nameFigure);
+                        } else {   
+                            nameFull = pName;
+                        }
+                        
+                        image.Write(imode, pdir + nameFull + pExt);                      
+                        cntFigures++;
+                    }
+                }
+            }
+            function DumpAllImages(pdir, pHeight, pWidth, pFontFactor, pFit) {
                 var clsidFigure = 147; // figures
-                var clsidProto = 400; // prototypes
-                var clsidAnSet = 429;
+                var clsidEnv = 105; // load cases
+                var clsidModel = 104; // model
+                var clsidMesh = 127; // mesh
                 
                 var activeObjs = DS.Tree.AllObjects;
                 if (!activeObjs)
                     return;
                 var numObjs = activeObjs.Count;
-                var pathImages;
                 
                 var gr_IMAGE2FILE = 0x16;
                 var gr_ImgResEnhanced = 0x1C;
                 var gr_FONTMAGFACTOR = 0x0;
+                
                 DS.Graphics.Info(gr_IMAGE2FILE) = -1;
                 DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = -1;
                 DS.Graphics.GfxUtility.Legend.iSImgResEnhanced = -1;
                 DS.Graphics.Info(gr_ImgResEnhanced) = -1;
-                DS.Graphics.InfoDouble(gr_FONTMAGFACTOR) = pFontFactor;
+                DS.Graphics.InfoDouble(gr_FONTMAGFACTOR) = pFontFactor;                  
                 
                 if ((pHeight > 0) && (pWidth > 0)) {
                     DS.Graphics.MemStreamHeight = pHeight;
                     DS.Graphics.MemStreamWidth = pWidth;
                 }
-                
-                
-                DS.Graphics.StreamMode = 1;    
-                    
-                var image = DS.Graphics.ImageCaptureControl;
+                DS.Graphics.StreamMode = 1;                                                       
                          
                 var prevColor1 = DS.Graphics.Scene.Color(1); 
                 var prevColor2 = DS.Graphics.Scene.Color(2);
@@ -693,70 +744,27 @@ class WBInterface(object):
 
                 var prevLegend = DS.Graphics.LegendVisibility;
                 var prevRuler = DS.Graphics.RulerVisibility;
-
+                
+                // make model overview
+                DS.Graphics.TriadOn = false;
+                DS.Graphics.LegendVisibility = false; 
                 DS.Graphics.RulerVisibility = false;
-                DS.Graphics.LegendVisibility = true;
-
-      
-                //DS.Graphics.SetFontStyle( 0, 'Arial', 0, 0, 30, 0, 0 );
-                //DS.Graphics.SetFontStyle( 2, 'Arial', 0, 0, 30, 0, 0 );
-                //DS.Graphics.Redraw(1);
+                saveObjectsPictures(clsidModel, activeObjs, pdir, "overview", true, 1);
                 
+                // make mesh overview
+                DS.Graphics.TriadOn = false;
+                DS.Graphics.LegendVisibility = false; 
+                DS.Graphics.RulerVisibility = false;                
+                saveObjectsPictures(clsidMesh, activeObjs, pdir, "Mesh", true, 1);
                 
+                // debugger;
                 
-                var ansetObject;
-                for (var i = 1; i <= numObjs; i++) {
-                    var objActive = activeObjs.Item(i);
-                    var objClass = objActive.Class;
-
-                    if (objActive && objActive.ID && (objActive.Class == clsidAnSet)) {
-                        ansetObject = objActive;
-                        pathImages = ansetObject.SolverFilesDirectory;
-                    }
-                }
-
-                // DS.Graphics.GfxUtility.Legend.Draw();
-
-                var imode = 0;
-                var pic_ext = ".png";
-
-                var protos = 0;
-                var pic_cnt = 0;
-                for (var i = 1; i <= numObjs; i++) {
-                    var objActive = activeObjs.Item(i);
-                    var objClass = objActive.Class;
-
-                    if (objActive && objActive.ID && (objActive.Class == clsidProto)) {
-                        if (protos >= 1)
-                            continue;
-                        // DS.Graphics.Redraw(1);
-                        DS.Graphics.Draw2(objActive.ID);
-                        
-                        image.Write(0, pdir + "FIG_" + ("00" + pic_cnt).slice (-3) + "_" + objActive.Name + "_" + objActive.ID + pic_ext);
-
-                        // DS.Graphics.SaveImage(objActive.ID, "FIG_" + ("00" + pic_cnt).slice (-3) + "_" + objActive.Name + "_" + objActive.ID, pdir);
-                        protos++;
-                        pic_cnt++;
-                    }
-                }
-
-                //debugger;
-
-                for (var i = 1; i <= numObjs; i++) {
-                    var objActive = activeObjs.Item(i);
-                    var objClass = objActive.Class;
-
-                    if (objActive && objActive.ID && (objActive.Class == clsidFigure))
-                    {
-                        DS.Graphics.Draw2(objActive.ID);
-                        
-                        image.Write(0, pdir + "FIG_" + ("00" + pic_cnt).slice (-3) + "_" + objActive.Name + "_" + objActive.ID + pic_ext);
-
-                        // DS.Graphics.SaveImage(objActive.ID, "FIG_" + ("00" + pic_cnt).slice (-3) + "_" + objActive.Name + "_" + objActive.ID, pdir);
-                        pic_cnt++;
-                    }
-                }
-                
+                // dump all figures
+                DS.Graphics.TriadOn = true;
+                DS.Graphics.LegendVisibility = true; 
+                DS.Graphics.RulerVisibility = false;
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, false, pFit, 0);
+                                              
                 DS.Graphics.Scene.Color(1) = prevColor1;
                 DS.Graphics.Scene.Color(2) = prevColor2;
                 DS.Graphics.Scene.Color(5) = prevColor5;
@@ -770,15 +778,12 @@ class WBInterface(object):
                 DS.Graphics.Info(gr_ImgResEnhanced) = 0;
                 DS.Graphics.StreamMode = 0; //so the geometry view will become visible again
                
-                DS.Graphics.Redraw(1);
-                
-                //DS.Graphics.SetFontStyle( 0, 'Arial', 0, 0, 16, 0, 0 );
-                //DS.Graphics.SetFontStyle( 2, 'Arial', 0, 0, 16, 0, 0 );
-                //DS.Graphics.Redraw(1);
+                DS.Graphics.Redraw(1);               
             }
         '''
+        jsmain = 'DumpAllImages("{}", {}, {}, {}, {})'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
         
-        jscode = jscode + 'DumpAllImages("{}", {}, {}, {})'.format(self._winpath_js(fpath), height, width, fontfact)
+        jscode = jsfun + self._try_wrapper_js(jsmain)
          
         try:
             self._send_js_macro(container, jscode, module, visible=True)
@@ -789,40 +794,7 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
-    def _send_js_macro(self, sys, code, comp, visible=False):
-        """
-        Executes JS macro in Mechanical. 
-        
-        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
-        This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
-        which will allow JS macro execution. This method does NOT support macro from file!
-        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename. 
-        
-        Arg:
-            sys: str; specify a Mechanical system, e.g. 'SYS'
-            code: str; JS macro string
-            comp: str; module to open
-        """
-    
-        # filepath = workbench.GetUserFilesDirectory()
-        # filename = os.path.join(filepath,'wb_mac.js')
-        # with open(filename, 'w') as f:
-            # f.write(code)
-        
-        ds_space = 'WB.AppletList.Applet("DSApplet").App.'
-        code = code.replace('DS.', ds_space)
-        
-        system = workbench.GetSystem(Name=sys)
-        model = system.GetContainer(ComponentName=comp)
-        
-        model.Edit(Interactive=visible)
-        
-        model.SendCommand(Command=code)
-        
-        model.Exit()
-        
-    
-    # --------------------------------------------------------------------
+
     def _clear_DPs(self):
         
         dps = self._get_DPs()
@@ -952,12 +924,62 @@ class WBInterface(object):
     @staticmethod
     def _get_parameter(name):
         return workbench.Parameters.GetParameter(Name=name)	
+    # ---------------------------------------------------------------
+    # ---------------------------------------------------------------
+    # ---------------------------------------------------------------
+    @staticmethod
+    def _send_js_macro(sys, code, comp, visible=False):
+        """
+        Executes JS macro in Mechanical. 
+        
+        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
+        This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
+        which will allow JS macro execution. This method does NOT support macro from file!
+        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename. 
+        
+        Arg:
+            sys: str; specify a Mechanical system, e.g. 'SYS'
+            code: str; JS macro string
+            comp: str; module to open
+        """
     
+        # filepath = workbench.GetUserFilesDirectory()
+        # filename = os.path.join(filepath,'wb_mac.js')
+        # with open(filename, 'w') as f:
+            # f.write(code)
+        
+        ds_space = 'WB.AppletList.Applet("DSApplet").App.'
+        code = code.replace('DS.', ds_space)
+        
+        system = workbench.GetSystem(Name=sys)
+        model = system.GetContainer(ComponentName=comp)
+        
+        model.Edit(Interactive=visible)
+        
+        model.SendCommand(Command=code)
+        
+        model.Exit()
+    # ---------------------------------------------------------------    
+    @staticmethod
+    def _try_wrapper_js(code):
+        return '''
+            try {
+                %s;
+            } catch (err) {
+            
+            }       
+        ''' % code
+    # ---------------------------------------------------------------
     @staticmethod
     def _winpath_js(dirpath):
         return os.path.join(dirpath, '').replace('\\', '\\\\')
+    # ---------------------------------------------------------------    
+    @staticmethod
+    def _bool_js(value):
+        return 'true' if value else 'false'
 
-        
+    
+
 #__________________________________________________________
 
 class NoActiveProjectFound(Exception):

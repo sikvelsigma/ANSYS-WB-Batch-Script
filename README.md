@@ -11,7 +11,7 @@ This is a collection of python scripts I made to make my life easier when dealin
 3. *ExcelFileReader.py*
 4. *CSVTable.py*
 
-Ansys Workbench comes with IronPython 2.7 so to run it from batch mode we only need to write a python script, which will control the flow of the project (*run_script.py* as an example here) and a *.bat* file (*run2.bat* as an example here).
+Ansys Workbench comes with IronPython 2.7 so to run it from batch mode we only need to write a python script, which will control the flow of the project (*run_script.py* as an example here) and a *.bat* file (*run.bat* as an example here).
 
 - Module *WBInterface.py* is the main module which contains a class with all the useful workbench commands. I tried to document it as much as I could. This module is absolutely essential to have.
 
@@ -26,7 +26,7 @@ First of all, this was all made with running it on a remote machine in mind, whe
 So, the simplest way to use all of this would be:
 
 1. Drop modules *WBInterface.py* and *Logger.py* into the same folder where your ANSYS WB archive/project currently resides
-2. Drop *run_script.py* and *run2.bat* there also
+2. Drop *run_script.py* and *run.bat* there also
 3. Configure *.bat* file for your machine and run it; format of *.bat* file:
 
         "<ansysdir>\v<ver>\Framework\bin\Win64\RunWB2.exe" -B -R "run_script.py"
