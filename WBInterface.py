@@ -42,14 +42,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.0.8'
+__version__ = '2.0.9'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.0.8'
+    __version__ = '2.0.9'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -544,7 +544,7 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     # JScript Methods
     # --------------------------------------------------------------- 
-    def set_cores_number(self, container, value, module='Model', use_try=True):
+    def set_cores_number(self, container, value, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
         Sets number of cores in Mechanical. 
@@ -556,7 +556,7 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             value: int
             module: str; module to open
-            use_try: bool; wraps js main cammands in a try block
+            ignore_js_err: bool; wraps js main cammands in a try block
         """
         if not isinstance(value, int) or value < 0:
             self._log_('Error: Attempted to set incorrect number of cores: {}'.format(value))
@@ -593,7 +593,7 @@ class WBInterface(object):
         
         jsmain = 'setNumberOfCores("{}")'.format(value)
         
-        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
         
         try:
@@ -604,7 +604,7 @@ class WBInterface(object):
             self._log_(err_msg, 1)
         
     # -------------------------------------------------------------------- 
-    def set_distributed(self, container, value, module='Model', use_try=True):
+    def set_distributed(self, container, value, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
         Activates/deactivates DMP in Mechanical. 
@@ -616,7 +616,7 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             value: boolean
             module: str; module to open
-            use_try: bool; wraps js main cammands in a try block
+            ignore_js_err: bool; wraps js main cammands in a try block
         """
         value_js = self._bool_js(value)
         if value_js == 'true':
@@ -644,7 +644,7 @@ class WBInterface(object):
         jsmain = 'setDMP({})'.format(value_js)
         
         
-        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
         
         try:
@@ -655,7 +655,7 @@ class WBInterface(object):
             self._log_(err_msg, 1)
     
     # -------------------------------------------------------------------- 
-    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', use_try=False):
+    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
         """
         Tested only on ANSYS2019R3!
         Saves all figures (not plot!) in fpath. 
@@ -665,7 +665,7 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
             module: str; module to open
-            use_try: bool; wraps js main cammands in a try block
+            ignore_js_err: bool; wraps js main cammands in a try block
         """
         self._log_('Saving all figures in {}'.format(fpath), 1)
         
@@ -676,6 +676,7 @@ class WBInterface(object):
             function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pFit, imode){                              
                 var numObjs = activeObjs.Count;
                 var image = DS.Graphics.ImageCaptureControl;
+                var clsidEnv = 105; // load cases
                 
                 switch (imode) 
                 {
@@ -697,8 +698,8 @@ class WBInterface(object):
                         DS.Graphics.Draw2(objActive.ID);
                         
                         if (pFit) {
-                            DS.Script.doGraphicsFit();
                             DS.Graphics.setisoview(7);
+                            DS.Script.doGraphicsFit();                           
                         }
                         
                         if (!pName) {
@@ -716,8 +717,7 @@ class WBInterface(object):
                             nameFull = (picEnum + "_" + nameSolution + "_" + nameParent + "_" + nameFigure);
                         } else {   
                             nameFull = pName;
-                        }
-                        
+                        }                       
                         image.Write(imode, pdir + nameFull + pExt);                      
                         cntFigures++;
                         if (pName) break;
@@ -805,7 +805,7 @@ class WBInterface(object):
         '''
         jsmain = 'DumpAllImages("{}", {}, {}, {}, {})'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
         
-        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
          
         try:
@@ -841,13 +841,13 @@ class WBInterface(object):
         tempfile = os.path.join(tempdir, tempfile)
                
         with open(tempfile, 'w') as f:
-            self._log_('THIS FUNCTION IS A PLACEHOLDER')
+            self._log_('"send_act_macro()" METHOD IS A PLACEHOLDER')
             return None              
                
-        self.send_act_macfile(sys, tempfile, comp, use_try=False)       
+        self.send_act_macfile(sys, tempfile, comp, ignore_js_err=False)       
         
     # --------------------------------------------------------------------     
-    def send_act_macfile(self, mech_sys, filename, mech_comp='Model', use_try=False): 
+    def send_act_macfile(self, mech_sys, filename, mech_comp='Model', ignore_js_err=False): 
         """
         Executes a macro file using Mechanical in-build macro executor.
         
@@ -855,7 +855,7 @@ class WBInterface(object):
             mech_sys: str; specify a Mechanical system, e.g. 'SYS'
             filename: str; macro file
             mech_comp: str; module to open
-            use_try: bool; wraps js main cammands in a try block
+            ignore_js_err: bool; wraps js main cammands in a try block
         """
         try:
             ext = os.path.basename(filename).split('.')[1]
@@ -876,7 +876,7 @@ class WBInterface(object):
             jsfun = ''       
             jsmain = 'DS.Script.doToolsRunMacro("{}")'.format(jsfilename) 
             
-            if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+            if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
             else: jscode = jsfun + jsmain
             
             try:
