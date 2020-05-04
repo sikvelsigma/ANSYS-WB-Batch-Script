@@ -5,6 +5,7 @@ Note: Workbench uses IronPython (Python 2.7)!
 #__________________________________________________________
 #__________________________________________________________
 import os
+import shutil
 # import csv
 from glob import glob
 from functools import partial 
@@ -16,6 +17,7 @@ from csv import QUOTE_MINIMAL
 
 from glob import glob 
 
+from time import sleep
 # Import global from main to access Workbench commands
 import __main__ as workbench
 
@@ -40,16 +42,18 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.0.7'
+__version__ = '2.0.8'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.0.7'
+    __version__ = '2.0.8'
     
-
+    _macro_def_dir = '_TempScript'
+    __macro_dir_path = ''
+    __macros_count = 0    
     # ---------------------------------------------------------------	
     # Public attributes
     # ---------------------------------------------------------------
@@ -162,8 +166,11 @@ class WBInterface(object):
             self.runtime = self._logger.runtime
         except:
             self.runtime = None
-            
-        
+    # --------------------------------------------------------------------        
+    def __del__(self):   
+        if self.__macro_dir_path and os.path.exists(__macro_dir_path):
+            shutil.rmtree(self.__macro_dir_path, ignore_errors=True)
+
     # ---------------------------------------------------------------		
     # Public methods
     # ---------------------------------------------------------------
@@ -472,6 +479,10 @@ class WBInterface(object):
         
         self._log_('Success: {} outputs specified'.format(len(self._param_out)), 1)
     # -------------------------------------------------------------------- 
+    def save_project(self):
+        workbench.Save(Overwrite=True)
+        self._log_('Project Saved!', 1)
+    # --------------------------------------------------------------------
     def output_parameters(self, output_file_name=None, full_report_file=None, csv_delim=None, fkey='wb'):
         """
         Output parameters in a file. Set output_file_name = '' to suppress
@@ -533,7 +544,7 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     # JScript Methods
     # --------------------------------------------------------------- 
-    def set_cores_number(self, container, value, module='Model'):
+    def set_cores_number(self, container, value, module='Model', use_try=True):
         """
         Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
         Sets number of cores in Mechanical. 
@@ -545,6 +556,7 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             value: int
             module: str; module to open
+            use_try: bool; wraps js main cammands in a try block
         """
         if not isinstance(value, int) or value < 0:
             self._log_('Error: Attempted to set incorrect number of cores: {}'.format(value))
@@ -581,7 +593,8 @@ class WBInterface(object):
         
         jsmain = 'setNumberOfCores("{}")'.format(value)
         
-        jscode = jsfun + self._try_wrapper_js(jsmain)
+        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
         
         try:
             self._send_js_macro(container, jscode, module)
@@ -591,7 +604,7 @@ class WBInterface(object):
             self._log_(err_msg, 1)
         
     # -------------------------------------------------------------------- 
-    def set_distributed(self, container, value, module='Model'):
+    def set_distributed(self, container, value, module='Model', use_try=True):
         """
         Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
         Activates/deactivates DMP in Mechanical. 
@@ -603,6 +616,7 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             value: boolean
             module: str; module to open
+            use_try: bool; wraps js main cammands in a try block
         """
         value_js = self._bool_js(value)
         if value_js == 'true':
@@ -629,7 +643,9 @@ class WBInterface(object):
         '''
         jsmain = 'setDMP({})'.format(value_js)
         
-        jscode = jsfun + self._try_wrapper_js(jsmain)
+        
+        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
         
         try:
             self._send_js_macro(container, jscode, module)
@@ -638,8 +654,8 @@ class WBInterface(object):
             self._log_('Your ANSYS might use old interface')
             self._log_(err_msg, 1)
     
-    
-    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model'):
+    # -------------------------------------------------------------------- 
+    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', use_try=False):
         """
         Tested only on ANSYS2019R3!
         Saves all figures (not plot!) in fpath. 
@@ -649,10 +665,11 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
             module: str; module to open
+            use_try: bool; wraps js main cammands in a try block
         """
         self._log_('Saving all figures in {}'.format(fpath), 1)
         
-        if not os.path.exists(fpath): os.mkdir(fpath)
+        if not os.path.exists(fpath): os.makedirs(fpath)
 
         
         jsfun = '''
@@ -666,7 +683,7 @@ class WBInterface(object):
                         pExt = '.png';
                         break;
                     case 1:
-                        pExt = '.jpg';
+                        pExt = '.jpeg';
                         break;
                 }
                 
@@ -681,6 +698,7 @@ class WBInterface(object):
                         
                         if (pFit) {
                             DS.Script.doGraphicsFit();
+                            DS.Graphics.setisoview(7);
                         }
                         
                         if (!pName) {
@@ -702,6 +720,7 @@ class WBInterface(object):
                         
                         image.Write(imode, pdir + nameFull + pExt);                      
                         cntFigures++;
+                        if (pName) break;
                     }
                 }
             }
@@ -744,14 +763,15 @@ class WBInterface(object):
 
                 var prevLegend = DS.Graphics.LegendVisibility;
                 var prevRuler = DS.Graphics.RulerVisibility;
+                var prevTriad = DS.Graphics.TriadOn
                 
-                // make model overview
+                // ====Make model overview====
                 DS.Graphics.TriadOn = false;
                 DS.Graphics.LegendVisibility = false; 
                 DS.Graphics.RulerVisibility = false;
-                saveObjectsPictures(clsidModel, activeObjs, pdir, "overview", true, 1);
+                saveObjectsPictures(clsidModel, activeObjs, pdir, "model_overview", true, 1);
                 
-                // make mesh overview
+                // ====Make mesh overview====
                 DS.Graphics.TriadOn = false;
                 DS.Graphics.LegendVisibility = false; 
                 DS.Graphics.RulerVisibility = false;                
@@ -759,18 +779,20 @@ class WBInterface(object):
                 
                 // debugger;
                 
-                // dump all figures
+                // ====Dump all figures====
                 DS.Graphics.TriadOn = true;
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
-                saveObjectsPictures(clsidFigure, activeObjs, pdir, false, pFit, 0);
-                                              
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pFit, 0);
+                
+                // ====Restore settings====
                 DS.Graphics.Scene.Color(1) = prevColor1;
                 DS.Graphics.Scene.Color(2) = prevColor2;
                 DS.Graphics.Scene.Color(5) = prevColor5;
                 DS.Graphics.Scene.Color(6) = prevColor6;
                 DS.Graphics.LegendVisibility = prevLegend;
                 DS.Graphics.RulerVisibility = prevRuler;
+                DS.Graphics.TriadOn = prevTriad 
                 
                 DS.Graphics.Info(gr_IMAGE2FILE) = 0;
                 DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = 0;
@@ -783,7 +805,8 @@ class WBInterface(object):
         '''
         jsmain = 'DumpAllImages("{}", {}, {}, {}, {})'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
         
-        jscode = jsfun + self._try_wrapper_js(jsmain)
+        if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
          
         try:
             self._send_js_macro(container, jscode, module, visible=True)
@@ -791,6 +814,79 @@ class WBInterface(object):
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
      
+    # -------------------------------------------------------------------- 
+    def send_act_macro(self, sys, code, ext='py', comp='Model'): 
+        """
+        !!!!THIS IS WiP AND NOT FUNCTIONAL!!!!
+        Sends Python/JScript code to Mechanical in-build macro executor.
+        Arg:
+            sys: str; specify a Mechanical system, e.g. 'SYS'
+            code: str; code to execute
+            ext: str; macro extention
+            comp: str; module to open          
+        """
+        
+        if ext == 'py': logext = 'Python'
+        elif ext == 'js': logext = 'JScript'
+        else: logext = ""
+        logext = logext if logext else ext
+                    
+        self.__macros_count += 1
+        tempdir = os.path.join(os.getcwd(), self._macro_def_dir)
+        if not os.path.exists(tempdir): 
+            os.makedirs(tempdir)
+            self.__macro_dir_path = tempdir
+        
+        tempfile = '{}_Script.{}'.format(self.__macros_count, ext)       
+        tempfile = os.path.join(tempdir, tempfile)
+               
+        with open(tempfile, 'w') as f:
+            self._log_('THIS FUNCTION IS A PLACEHOLDER')
+            return None              
+               
+        self.send_act_macfile(sys, tempfile, comp, use_try=False)       
+        
+    # --------------------------------------------------------------------     
+    def send_act_macfile(self, mech_sys, filename, mech_comp='Model', use_try=False): 
+        """
+        Executes a macro file using Mechanical in-build macro executor.
+        
+        Arg:
+            mech_sys: str; specify a Mechanical system, e.g. 'SYS'
+            filename: str; macro file
+            mech_comp: str; module to open
+            use_try: bool; wraps js main cammands in a try block
+        """
+        try:
+            ext = os.path.basename(filename).split('.')[1]
+        except:
+            self._log_('Error: Could not determine a file extention', 1)
+        else:
+        
+            if ext == 'py': logext = 'Python'
+            elif ext == 'js': logext = 'JScript'
+            else: logext = ""
+            logext = logext if logext else ext
+                
+            jsfilename =  self._winpath_js(os.path.dirname(filename)) + os.path.basename(filename)
+             
+            self._log_('Sending ACT {} macro...'.format(logext)) 
+            self._log_('File: {}'.format(filename)) 
+            
+            jsfun = ''       
+            jsmain = 'DS.Script.doToolsRunMacro("{}")'.format(jsfilename) 
+            
+            if use_try: jscode = jsfun + self._try_wrapper_js(jsmain)
+            else: jscode = jsfun + jsmain
+            
+            try:
+                self._send_js_macro(mech_sys, jscode, mech_comp, visible=True)
+            except Exception as err_msg:
+                self._log_('An error occured!')
+                self._log_(err_msg, 1) 
+            else:
+                self._log_('Macro execution finished!', 1)
+              
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
@@ -927,8 +1023,9 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     # ---------------------------------------------------------------
     # ---------------------------------------------------------------
+        
     @staticmethod
-    def _send_js_macro(sys, code, comp, visible=False):
+    def _send_js_macro(sys, code, comp='Model', visible=False):
         """
         Executes JS macro in Mechanical. 
         
@@ -955,7 +1052,7 @@ class WBInterface(object):
         model = system.GetContainer(ComponentName=comp)
         
         model.Edit(Interactive=visible)
-        
+        # sleep(20)
         model.SendCommand(Command=code)
         
         model.Exit()
@@ -972,6 +1069,9 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     @staticmethod
     def _winpath_js(dirpath):
+        """
+        Make all back slashes into double
+        """
         return os.path.join(dirpath, '').replace('\\', '\\\\')
     # ---------------------------------------------------------------    
     @staticmethod
