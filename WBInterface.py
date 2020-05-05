@@ -42,14 +42,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.0.9'
+__version__ = '2.1.1'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.0.9'
+    __version__ = '2.1.1'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -207,7 +207,7 @@ class WBInterface(object):
                     file_list = [f for f in glob(control_used)]
                     self._control_file = file_list[0]
                 except:
-                    self._log_('Control file not found! No parameters will be used.', 1)
+                    self._log_('Control file not found! No parameters will be used', 1)
                 else:
                     self._log_('Control file found: ' + self._control_file)
                     self._log_('Reading parameter list...')
@@ -395,7 +395,7 @@ class WBInterface(object):
         self.__active = True
         self.__DPs = self._get_DPs()
         self.__DPs_present = len(self.__DPs)
-        self._log_('Success!', 1)		
+        self._log_('Success', 1)		
     # -------------------------------------------------------------------- 
     def set_parameters(self, saveproject=True):
         """Set imported parameters into Workbench."""
@@ -419,7 +419,7 @@ class WBInterface(object):
             self._log_('An error occured while setting parameters!')
             self._log_(err_msg, 1)
             raise
-        self._log_('Success!', 1)
+        self._log_('Success', 1)
         if saveproject: self._save_project()
     # --------------------------------------------------------------------     
     def update_project(self, skip_error=True, skip_uncomplete=True):
@@ -429,7 +429,7 @@ class WBInterface(object):
             raise NoActiveProjectFound
             
         self._log_('Updating Workbench project...')
-        self._log_('Check _ProjectScratch directory for solver logs!')
+        self._log_('Check _ProjectScratch directory for solver logs')
         workbench.Parameters.ClearDesignPointsCache()
         
         # skip_er = 'SkipDesignPoint' if skip_error else 'Stop'
@@ -448,7 +448,7 @@ class WBInterface(object):
             # component1 = system1.GetComponent(Name="Model")
             # component1.Update(AllDependencies=True)
             if workbench.IsProjectUpToDate():
-                self._log_('Update successful!', 1)
+                self._log_('Update successful', 1)
             else:
                 self._log_('Project is not up-to-date, see messages below')
                 for msg in workbench.GetMessages():
@@ -481,7 +481,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def save_project(self):
         workbench.Save(Overwrite=True)
-        self._log_('Project Saved!', 1)
+        self._log_('Project Saved', 1)
     # --------------------------------------------------------------------
     def output_parameters(self, output_file_name=None, full_report_file=None, csv_delim=None, fkey='wb'):
         """
@@ -507,13 +507,18 @@ class WBInterface(object):
         self._param_out_value = defaultdict(list)
         self._log_('Retrieving output parameters... ')
     
-        for key in self._param_out:
-            for dp in self.__DPs:
-                val = self._get_parameter_value(dp, key)
-                self._param_out_value[key.upper()].append(val)	
-                
+        try:
+            for key in self._param_out:
+                for dp in self.__DPs:
+                    val = self._get_parameter_value(dp, key)
+                    self._param_out_value[key.upper()].append(val)	
+        except Exception as err_msg:
+            self._log_('Failed to retriev parameters!')
+            self._log_(err_msg, 1)
+            return
+            
         if output_file_name is None or output_file_name == '':
-            self._log_('No output file defined! Results stored internally.', 1)
+            self._log_('No output file defined! Results were stored internally', 1)
             return
             
         self._log_('Outputing parameters to ' + output_file_name + '...')
@@ -531,7 +536,7 @@ class WBInterface(object):
             self._log_('An error occured while outputting parameters!')
             self._log_(err_msg, 1)  
         else:
-            self._log_('Output successful!', 1)
+            self._log_('Output successful', 1)
         finally:
             try:
                 workbench.Parameters.ExportAllDesignPointsData(FileName=full_report_file)
@@ -563,8 +568,8 @@ class WBInterface(object):
             self._log_('Number of cores used unchanged!', 1)
             return
             
-        self._log_('Setting number of cores to {}'.format(value), 1)
-        self._log_('Do not set this number higher than a number of physical cores on a machine!'.format(value), 1)
+        self._log_('Setting number of cores to {}'.format(value))
+        self._log_('Do not set this number higher than a number of physical cores on a machine!'.format(value))
         
         # jscode = 'DS.Script.Configure_setNumberOfCores("{}")'.format(value)
         
@@ -591,7 +596,7 @@ class WBInterface(object):
              }
         '''
         
-        jsmain = 'setNumberOfCores("{}")'.format(value)
+        jsmain = 'setNumberOfCores("{}");'.format(value)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -620,9 +625,9 @@ class WBInterface(object):
         """
         value_js = self._bool_js(value)
         if value_js == 'true':
-            self._log_('Distributed solver: Enabled', 1)
+            self._log_('Distributed solver: Enabled')
         else:
-            self._log_('Distributed solver: Disabled', 1)
+            self._log_('Distributed solver: Disabled')
             
         jsfun = '''
             function setDMP(value)
@@ -641,7 +646,7 @@ class WBInterface(object):
                 jobHandlerManager.Save();
             }
         '''
-        jsmain = 'setDMP({})'.format(value_js)
+        jsmain = 'setDMP({});'.format(value_js)
         
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
@@ -667,7 +672,7 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
-        self._log_('Saving all figures in {}'.format(fpath), 1)
+        self._log_('Saving all figures in {}'.format(fpath))
         
         if not os.path.exists(fpath): os.makedirs(fpath)
 
@@ -711,20 +716,22 @@ class WBInterface(object):
                                 var objSearch = objActive.Parent;
                                 while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
                                 var nameSolution = (objSearch.Name).replace(/ |_/g, '');
+                                nameSolution = nameSolution + "_";
                             } catch (err) {
-                                var nameSolution = ""
+                                var nameSolution = "";
                             }
-                            nameFull = (picEnum + "_" + nameSolution + "_" + nameParent + "_" + nameFigure);
+                            nameFull = (picEnum + "_" + nameSolution + nameParent + "_" + nameFigure);
                         } else {   
                             nameFull = pName;
-                        }                       
+                        } 
+                        // DS.Graphics.Redraw(1);
                         image.Write(imode, pdir + nameFull + pExt);                      
                         cntFigures++;
                         if (pName) break;
                     }
                 }
             }
-            function DumpAllImages(pdir, pHeight, pWidth, pFontFactor, pFit) {
+            function DumpAllImages(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
                 var clsidFigure = 147; // figures
                 var clsidEnv = 105; // load cases
                 var clsidModel = 104; // model
@@ -749,6 +756,7 @@ class WBInterface(object):
                     DS.Graphics.MemStreamHeight = pHeight;
                     DS.Graphics.MemStreamWidth = pWidth;
                 }
+                
                 DS.Graphics.StreamMode = 1;                                                       
                          
                 var prevColor1 = DS.Graphics.Scene.Color(1); 
@@ -763,26 +771,37 @@ class WBInterface(object):
 
                 var prevLegend = DS.Graphics.LegendVisibility;
                 var prevRuler = DS.Graphics.RulerVisibility;
-                var prevTriad = DS.Graphics.TriadOn
-                
+                var prevTriad = DS.Graphics.TriadOn;
+                var prevRandom = DS.Graphics.RandomColors;                
+                                                                         
                 // ====Make model overview====
                 DS.Graphics.TriadOn = false;
                 DS.Graphics.LegendVisibility = false; 
-                DS.Graphics.RulerVisibility = false;
+                DS.Graphics.RulerVisibility = false;  
+                DS.Graphics.RandomColors = false;
                 saveObjectsPictures(clsidModel, activeObjs, pdir, "model_overview", true, 1);
                 
                 // ====Make mesh overview====
                 DS.Graphics.TriadOn = false;
                 DS.Graphics.LegendVisibility = false; 
-                DS.Graphics.RulerVisibility = false;                
+                DS.Graphics.RulerVisibility = false;        
+                DS.Graphics.RandomColors = false;                
                 saveObjectsPictures(clsidMesh, activeObjs, pdir, "Mesh", true, 1);
                 
                 // debugger;
                 
+                // ====Dump all enviroments====
+                DS.Graphics.TriadOn = true;
+                DS.Graphics.LegendVisibility = true; 
+                DS.Graphics.RulerVisibility = false;
+                DS.Graphics.RandomColors = true;
+                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", true, 0);
+                               
                 // ====Dump all figures====
                 DS.Graphics.TriadOn = true;
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
+                DS.Graphics.RandomColors = false;
                 saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pFit, 0);
                 
                 // ====Restore settings====
@@ -792,18 +811,17 @@ class WBInterface(object):
                 DS.Graphics.Scene.Color(6) = prevColor6;
                 DS.Graphics.LegendVisibility = prevLegend;
                 DS.Graphics.RulerVisibility = prevRuler;
-                DS.Graphics.TriadOn = prevTriad 
+                DS.Graphics.TriadOn = prevTriad;
+                DS.Graphics.RandomColors = prevRandom;               
                 
                 DS.Graphics.Info(gr_IMAGE2FILE) = 0;
                 DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = 0;
                 DS.Graphics.GfxUtility.Legend.IsImgResEnhanced = 0;
                 DS.Graphics.Info(gr_ImgResEnhanced) = 0;
-                DS.Graphics.StreamMode = 0; //so the geometry view will become visible again
-               
-                DS.Graphics.Redraw(1);               
+                DS.Graphics.StreamMode = 0; //so the geometry view will become visible again                            
             }
         '''
-        jsmain = 'DumpAllImages("{}", {}, {}, {}, {})'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
+        jsmain = 'DumpAllImages("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -814,6 +832,79 @@ class WBInterface(object):
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
      
+   
+    # -------------------------------------------------------------------- 
+    def set_unit_system(self, container, unit_sys, module='Model', ignore_js_err=True):
+        """
+        Tested only on ANSYS2019R3!
+        Changes unit system is Mechanical
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'
+            unit_sys_id: str; unit system; 
+                'MKS', 'CGS', 'NMM', 'BFT', 'BIN', 'UMKS', 'NMMton', 'NMMdat'          
+            module: str; module to open
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """       
+        if unit_sys == 'MKS': 
+            unit_sys_id = 0
+            unit_msg = 'Metric (m, kg, N, s, V, A)'
+        elif unit_sys == 'CGS': 
+            unit_sys_id = 1
+            unit_msg = 'Metric (cm, g, dyne, s, V, A)'
+        elif unit_sys == 'NMM': 
+            unit_sys_id = 2
+            unit_msg = 'Metric (mm, kg, N, s, mV, mA)'
+        elif unit_sys == 'BFT': 
+            unit_sys_id = 3
+            unit_msg = 'U.S. Customary (ft, lbm, lbf, °F, s, V, A)'
+        elif unit_sys == 'BIN': 
+            unit_sys_id = 4
+            unit_msg = 'U.S. Customary (in, lbm, lbf, °F, s, V, A)'
+        elif unit_sys == 'UMKS': 
+            unit_sys_id = 9
+            unit_msg = 'Metric (um, kg, uN, s, V, mA)'
+        elif unit_sys == 'NMMton': 
+            unit_sys_id = 13
+            unit_msg = 'Metric (mm, t, N, s, mV, mA)'
+        elif unit_sys == 'NMMdat': 
+            unit_sys_id = 14
+            unit_msg = 'Metric (mm, dat, N, s, mV, mA)'
+        else: 
+            self._log_('Cannot set unit system: unknown system ID = {}'.format(unit_sys), 1)
+            return
+        
+        self._log_('Setting units to {}: {}'.format(unit_sys, unit_msg))
+        
+        jsfun = '''
+            function setUnits(sysId) {
+                var id_UnitsMKS = 0;
+                var id_UnitsCGS = 1;
+                var id_UnitsNMM = 2;
+                var id_UnitsBFT = 3;
+                var id_UnitsBIN = 4;
+                var id_UnitsUMKS = 9;
+                var id_UnitsNMMton = 13;
+                var id_UnitsNMMdat = 14; 
+                
+                DS.UnitSystemID = sysId;
+                DS.Graphics.Redraw(1); 
+                DS.Script.FireFinished();
+                DS.Graphics.ResultPrefs.deformedScale = 0;
+                DS.Graphics.Redraw(1); 
+            }
+        '''
+    
+        jsmain = 'setUnits({});'.format(unit_sys_id)
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
     # -------------------------------------------------------------------- 
     def send_act_macro(self, sys, code, ext='py', comp='Model'): 
         """
@@ -861,6 +952,7 @@ class WBInterface(object):
             ext = os.path.basename(filename).split('.')[1]
         except:
             self._log_('Error: Could not determine a file extention', 1)
+            return None
         else:
         
             if ext == 'py': logext = 'Python'
@@ -874,7 +966,7 @@ class WBInterface(object):
             self._log_('File: {}'.format(filename)) 
             
             jsfun = ''       
-            jsmain = 'DS.Script.doToolsRunMacro("{}")'.format(jsfilename) 
+            jsmain = 'DS.Script.doToolsRunMacro("{}");'.format(jsfilename) 
             
             if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
             else: jscode = jsfun + jsmain
@@ -885,12 +977,47 @@ class WBInterface(object):
                 self._log_('An error occured!')
                 self._log_(err_msg, 1) 
             else:
-                self._log_('Macro execution finished!', 1)
+                self._log_('Macro execution finished', 1)
               
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
-
+    def _send_js_macro(self, sys, code, comp='Model', visible=False):
+        """
+        Executes JS macro in Mechanical. This method is used for all interactions with Mechanical.
+        
+        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
+        This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
+        which will allow JS macro execution. This method does NOT support macro from file!
+        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename. 
+        
+        Arg:
+            sys: str; specify a Mechanical system, e.g. 'SYS'
+            code: str; JS macro string
+            comp: str; module to open
+        """
+    
+        # filepath = workbench.GetUserFilesDirectory()
+        # filename = os.path.join(filepath,'wb_mac.js')
+        # with open(filename, 'w') as f:
+            # f.write(code)
+        self._log_('JScript at: | System: "{}" | Component: "{}" |'.format(sys, comp))
+        
+        ds_space = 'WB.AppletList.Applet("DSApplet").App.'
+        code = code.replace('DS.', ds_space) 
+        
+        try:                      
+            system = workbench.GetSystem(Name=sys)
+            model = system.GetContainer(ComponentName=comp)           
+            model.Edit(Interactive=visible)
+            model.SendCommand(Command=code)           
+            model.Exit()       
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+        else:
+            self._log_('Finished', 1)
+    
     def _clear_DPs(self):
         
         dps = self._get_DPs()
@@ -945,7 +1072,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def _save_project(self):
         workbench.Save(Overwrite=True)
-        self._log_('Project Saved!', 1)
+        self._log_('Project Saved', 1)
     # --------------------------------------------------------------------     
     def _set_parameter(self, dp, name, value):
         dp.SetParameterExpression(Parameter=self._get_parameter(name), Expression=value)			
@@ -1020,48 +1147,12 @@ class WBInterface(object):
     @staticmethod
     def _get_parameter(name):
         return workbench.Parameters.GetParameter(Name=name)	
-    # ---------------------------------------------------------------
-    # ---------------------------------------------------------------
-    # ---------------------------------------------------------------
-        
-    @staticmethod
-    def _send_js_macro(sys, code, comp='Model', visible=False):
-        """
-        Executes JS macro in Mechanical. 
-        
-        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
-        This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
-        which will allow JS macro execution. This method does NOT support macro from file!
-        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename. 
-        
-        Arg:
-            sys: str; specify a Mechanical system, e.g. 'SYS'
-            code: str; JS macro string
-            comp: str; module to open
-        """
-    
-        # filepath = workbench.GetUserFilesDirectory()
-        # filename = os.path.join(filepath,'wb_mac.js')
-        # with open(filename, 'w') as f:
-            # f.write(code)
-        
-        ds_space = 'WB.AppletList.Applet("DSApplet").App.'
-        code = code.replace('DS.', ds_space)
-        
-        system = workbench.GetSystem(Name=sys)
-        model = system.GetContainer(ComponentName=comp)
-        
-        model.Edit(Interactive=visible)
-        # sleep(20)
-        model.SendCommand(Command=code)
-        
-        model.Exit()
-    # ---------------------------------------------------------------    
+    # ---------------------------------------------------------------   
     @staticmethod
     def _try_wrapper_js(code):
         return '''
             try {
-                %s;
+                %s
             } catch (err) {
             
             }       
@@ -1077,8 +1168,6 @@ class WBInterface(object):
     @staticmethod
     def _bool_js(value):
         return 'true' if value else 'false'
-
-    
 
 #__________________________________________________________
 
