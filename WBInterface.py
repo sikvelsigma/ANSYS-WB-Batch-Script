@@ -42,14 +42,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.1.1'
+__version__ = '2.1.2'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.1.1'
+    __version__ = '2.1.2'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -660,11 +660,211 @@ class WBInterface(object):
             self._log_(err_msg, 1)
     
     # -------------------------------------------------------------------- 
+    def save_overview(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+        """
+        Tested only on ANSYS2019R3!
+        Saves model overview.
+        This is a modified ripped function from ANSYS to dump all figures in cwd.
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'
+            fpath: str; save directory
+            filename: str
+            module: str; module to open
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """  
+        try:
+            basename, ext = filename.split('.')
+        except:
+            self._log_('Error: Could not determine a file extention!', 1)
+            return None
+        
+        if ext == 'png': mode = 0
+        elif ext == 'jpg' or ext == 'jpeg': mode = 1
+        else:
+            self._log_('Unsupported file extention!', 1)
+            return None
+        
+        self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
+        if not os.path.exists(fpath): os.makedirs(fpath)
+                    
+        jsfun = self.__jsfun_savepics() + '''
+            function DumpOverview(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode) {                                          
+                var clsidModel = 104; // model
+               
+                var activeObjs = DS.Tree.AllObjects;
+                if (!activeObjs)
+                    return;
+                var numObjs = activeObjs.Count;
+                
+                var prevColor1 = DS.Graphics.Scene.Color(1); 
+                var prevColor2 = DS.Graphics.Scene.Color(2);
+                var prevColor5 = DS.Graphics.Scene.Color(5);
+                var prevColor6 = DS.Graphics.Scene.Color(6);
+                var prevLegend = DS.Graphics.LegendVisibility;
+                var prevRuler = DS.Graphics.RulerVisibility;
+                var prevTriad = DS.Graphics.TriadOn;
+                var prevRandom = DS.Graphics.RandomColors; 
+                
+                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);                                                                                                                        
+                
+                //debugger;
+                // ====Make model overview====
+                DS.Graphics.TriadOn = false;
+                DS.Graphics.LegendVisibility = false; 
+                DS.Graphics.RulerVisibility = false;  
+                DS.Graphics.RandomColors = false;
+                saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode);                             
+                
+                // ====Restore settings====              
+                postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
+            }
+        '''
+        jsmain = 'DumpOverview("{}", {}, {}, {}, {}, "{}", {});'.format(self._winpath_js(fpath), height, width, fontfact, 
+                                                              self._bool_js(zoom_to_fit), basename, mode)
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+    # -------------------------------------------------------------------- 
+    def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
+        """
+        Tested only on ANSYS2019R3!
+        Saves mesh view.
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'
+            fpath: str; save directory
+            filename: str
+            module: str; module to open
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """  
+        try:
+            basename, ext = filename.split('.')
+        except:
+            self._log_('Error: Could not determine a file extention!', 1)
+            return None
+        
+        if ext == 'png': mode = 0
+        elif ext == 'jpg' or ext == 'jpeg': mode = 1
+        else:
+            self._log_('Unsupported file extention!', 1)
+            return None
+        
+        self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
+        if not os.path.exists(fpath): os.makedirs(fpath)
+                    
+        jsfun = self.__jsfun_savepics() + '''
+            function DumpMesh(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode) {                                          
+                var clsidMesh = 127; // mesh
+               
+                var activeObjs = DS.Tree.AllObjects;
+                if (!activeObjs)
+                    return;
+                var numObjs = activeObjs.Count;
+                
+                var prevColor1 = DS.Graphics.Scene.Color(1); 
+                var prevColor2 = DS.Graphics.Scene.Color(2);
+                var prevColor5 = DS.Graphics.Scene.Color(5);
+                var prevColor6 = DS.Graphics.Scene.Color(6);
+                var prevLegend = DS.Graphics.LegendVisibility;
+                var prevRuler = DS.Graphics.RulerVisibility;
+                var prevTriad = DS.Graphics.TriadOn;
+                var prevRandom = DS.Graphics.RandomColors; 
+                
+                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);                                                                                                                        
+                
+                //debugger;
+                // ====Make model overview====
+                DS.Graphics.TriadOn = false;
+                DS.Graphics.LegendVisibility = false; 
+                DS.Graphics.RulerVisibility = false;        
+                DS.Graphics.RandomColors = false; 
+                saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode);                             
+                
+                // ====Restore settings====              
+                postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
+            }
+        '''
+        jsmain = 'DumpMesh("{}", {}, {}, {}, {}, "{}", {});'.format(self._winpath_js(fpath), height, width, fontfact, 
+                                                              self._bool_js(zoom_to_fit), basename, mode)
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+       
+    def save_setups_view(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
+        """
+        Tested only on ANSYS2019R3!
+        Saves all environments setups in png.
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'
+            fpath: str; save directory
+            module: str; module to open
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """  
+        self._log_('Saving all environment setups in {}'.format(fpath))      
+        if not os.path.exists(fpath): os.makedirs(fpath)
+        
+        jsfun = self.__jsfun_savepics() + '''
+            function DumpSetups(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
+                var clsidEnv = 105; // load cases
+               
+                var activeObjs = DS.Tree.AllObjects;
+                if (!activeObjs)
+                    return;
+                var numObjs = activeObjs.Count;
+                
+                var prevColor1 = DS.Graphics.Scene.Color(1); 
+                var prevColor2 = DS.Graphics.Scene.Color(2);
+                var prevColor5 = DS.Graphics.Scene.Color(5);
+                var prevColor6 = DS.Graphics.Scene.Color(6);
+                var prevLegend = DS.Graphics.LegendVisibility;
+                var prevRuler = DS.Graphics.RulerVisibility;
+                var prevTriad = DS.Graphics.TriadOn;
+                var prevRandom = DS.Graphics.RandomColors; 
+                
+                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);                                                                                                                        
+                                                                         
+                // ====Dump all enviroments====
+                DS.Graphics.TriadOn = true;
+                DS.Graphics.LegendVisibility = true; 
+                DS.Graphics.RulerVisibility = false;
+                DS.Graphics.RandomColors = true;
+                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", "Setup", pFit, 0);
+              
+                // ====Restore settings====              
+                postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
+            }
+        '''                        
+        jsmain = 'DumpSetups("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+
+        
+    # -------------------------------------------------------------------- 
     def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
         """
         Tested only on ANSYS2019R3!
-        Saves all figures (not plot!) in fpath. 
-        This is a modified ripped function from ANSYS to dump all figures in cwd.
+        Saves all figures (not plot!) in png. 
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
@@ -677,151 +877,38 @@ class WBInterface(object):
         if not os.path.exists(fpath): os.makedirs(fpath)
 
         
-        jsfun = '''
-            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pFit, imode){                              
-                var numObjs = activeObjs.Count;
-                var image = DS.Graphics.ImageCaptureControl;
-                var clsidEnv = 105; // load cases
-                
-                switch (imode) 
-                {
-                    case 0:
-                        pExt = '.png';
-                        break;
-                    case 1:
-                        pExt = '.jpeg';
-                        break;
-                }
-                
-                var cntFigures = 0;
-                
-                for (var i = 1; i <= numObjs; i++) {
-                    var objActive = activeObjs.Item(i);
-
-                    if (objActive && objActive.ID && (objActive.Class == clsidObj))
-                    {
-                        DS.Graphics.Draw2(objActive.ID);
-                        
-                        if (pFit) {
-                            DS.Graphics.setisoview(7);
-                            DS.Script.doGraphicsFit();                           
-                        }
-                        
-                        if (!pName) {
-                            var picEnum = ("00" + cntFigures).slice (-3);
-                            var nameParent = (objActive.Parent.Name).replace(/ |_/g, '');
-                            var nameFigure = (objActive.Name).replace(/ |_/g, '');
-                            
-                            try {
-                                var objSearch = objActive.Parent;
-                                while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
-                                var nameSolution = (objSearch.Name).replace(/ |_/g, '');
-                                nameSolution = nameSolution + "_";
-                            } catch (err) {
-                                var nameSolution = "";
-                            }
-                            nameFull = (picEnum + "_" + nameSolution + nameParent + "_" + nameFigure);
-                        } else {   
-                            nameFull = pName;
-                        } 
-                        // DS.Graphics.Redraw(1);
-                        image.Write(imode, pdir + nameFull + pExt);                      
-                        cntFigures++;
-                        if (pName) break;
-                    }
-                }
-            }
-            function DumpAllImages(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
+        jsfun = self.__jsfun_savepics() + '''
+            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
                 var clsidFigure = 147; // figures
-                var clsidEnv = 105; // load cases
-                var clsidModel = 104; // model
-                var clsidMesh = 127; // mesh
                 
                 var activeObjs = DS.Tree.AllObjects;
                 if (!activeObjs)
                     return;
                 var numObjs = activeObjs.Count;
                 
-                var gr_IMAGE2FILE = 0x16;
-                var gr_ImgResEnhanced = 0x1C;
-                var gr_FONTMAGFACTOR = 0x0;
-                
-                DS.Graphics.Info(gr_IMAGE2FILE) = -1;
-                DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = -1;
-                DS.Graphics.GfxUtility.Legend.iSImgResEnhanced = -1;
-                DS.Graphics.Info(gr_ImgResEnhanced) = -1;
-                DS.Graphics.InfoDouble(gr_FONTMAGFACTOR) = pFontFactor;                  
-                
-                if ((pHeight > 0) && (pWidth > 0)) {
-                    DS.Graphics.MemStreamHeight = pHeight;
-                    DS.Graphics.MemStreamWidth = pWidth;
-                }
-                
-                DS.Graphics.StreamMode = 1;                                                       
-                         
                 var prevColor1 = DS.Graphics.Scene.Color(1); 
                 var prevColor2 = DS.Graphics.Scene.Color(2);
                 var prevColor5 = DS.Graphics.Scene.Color(5);
                 var prevColor6 = DS.Graphics.Scene.Color(6);
-                
-                DS.Graphics.Scene.Color(1) = 0x00ffffff; //hex value for white - this will blend in with the ANSYS logo,
-                DS.Graphics.Scene.Color(2) = 0x00ffffff; //making the logo impossible to see.
-                DS.Graphics.Scene.Color(5) = prevColor5; // HACK (restore color 5)
-                DS.Graphics.Scene.Color(6) = prevColor6; // HACK (restore color 6)
-
                 var prevLegend = DS.Graphics.LegendVisibility;
                 var prevRuler = DS.Graphics.RulerVisibility;
                 var prevTriad = DS.Graphics.TriadOn;
-                var prevRandom = DS.Graphics.RandomColors;                
-                                                                         
-                // ====Make model overview====
-                DS.Graphics.TriadOn = false;
-                DS.Graphics.LegendVisibility = false; 
-                DS.Graphics.RulerVisibility = false;  
-                DS.Graphics.RandomColors = false;
-                saveObjectsPictures(clsidModel, activeObjs, pdir, "model_overview", true, 1);
+                var prevRandom = DS.Graphics.RandomColors; 
                 
-                // ====Make mesh overview====
-                DS.Graphics.TriadOn = false;
-                DS.Graphics.LegendVisibility = false; 
-                DS.Graphics.RulerVisibility = false;        
-                DS.Graphics.RandomColors = false;                
-                saveObjectsPictures(clsidMesh, activeObjs, pdir, "Mesh", true, 1);
-                
-                // debugger;
-                
-                // ====Dump all enviroments====
-                DS.Graphics.TriadOn = true;
-                DS.Graphics.LegendVisibility = true; 
-                DS.Graphics.RulerVisibility = false;
-                DS.Graphics.RandomColors = true;
-                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", true, 0);
-                               
+                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);                                                                                                                        
+                                                                                                                     
                 // ====Dump all figures====
                 DS.Graphics.TriadOn = true;
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = false;
-                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pFit, 0);
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", "Result", pFit, 0);
                 
-                // ====Restore settings====
-                DS.Graphics.Scene.Color(1) = prevColor1;
-                DS.Graphics.Scene.Color(2) = prevColor2;
-                DS.Graphics.Scene.Color(5) = prevColor5;
-                DS.Graphics.Scene.Color(6) = prevColor6;
-                DS.Graphics.LegendVisibility = prevLegend;
-                DS.Graphics.RulerVisibility = prevRuler;
-                DS.Graphics.TriadOn = prevTriad;
-                DS.Graphics.RandomColors = prevRandom;               
-                
-                DS.Graphics.Info(gr_IMAGE2FILE) = 0;
-                DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = 0;
-                DS.Graphics.GfxUtility.Legend.IsImgResEnhanced = 0;
-                DS.Graphics.Info(gr_ImgResEnhanced) = 0;
-                DS.Graphics.StreamMode = 0; //so the geometry view will become visible again                            
+                // ====Restore settings====              
+                postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        jsmain = 'DumpAllImages("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
+        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -837,7 +924,7 @@ class WBInterface(object):
     def set_unit_system(self, container, unit_sys, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3!
-        Changes unit system is Mechanical
+        Changes unit system is Mechanical.
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
@@ -877,25 +964,134 @@ class WBInterface(object):
         self._log_('Setting units to {}: {}'.format(unit_sys, unit_msg))
         
         jsfun = '''
-            function setUnits(sysId) {
-                var id_UnitsMKS = 0;
-                var id_UnitsCGS = 1;
-                var id_UnitsNMM = 2;
-                var id_UnitsBFT = 3;
-                var id_UnitsBIN = 4;
-                var id_UnitsUMKS = 9;
-                var id_UnitsNMMton = 13;
-                var id_UnitsNMMdat = 14; 
-                
+            function setUnits(sysId) {               
                 DS.UnitSystemID = sysId;
                 DS.Graphics.Redraw(1); 
                 DS.Script.FireFinished();
-                DS.Graphics.ResultPrefs.deformedScale = 0;
-                DS.Graphics.Redraw(1); 
             }
         '''
     
         jsmain = 'setUnits({});'.format(unit_sys_id)
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+        # -------------------------------------------------------------------- 
+    def set_figures_scale(self, container, scale, module='Model', ignore_js_err=True):
+        """
+        Tested only on ANSYS2019R3!
+        Sets scale of figures. 
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'         
+            module: str; module to open
+            scale: num or str; valid strings are
+                '0.5auto', 'auto', '2auto', '5auto', 'undef', 'actual'
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """   
+        strwrap = lambda x: '"{}"'.format(x)
+        
+        if isinstance(scale, str):
+            if scale == 'auto':
+                arg = strwrap(scale)
+                msg = 'auto'
+                
+            elif scale == '2auto':
+                arg = strwrap(scale)
+                msg = 'double auto'
+                
+            elif scale == '5auto':
+                arg = strwrap(scale)
+                msg = 'five auto'
+                
+            elif scale == 'undef' or scale == 'undeformed':
+                arg = strwrap(scale)
+                msg = 'undeformed'
+                
+            elif scale == '0.5auto':
+                arg = strwrap(scale)
+                msg = 'half auto'
+                
+            elif scale == 'actual':
+                arg = strwrap(scale)
+                msg = 'true scale'
+                
+            else:
+                self._log_('Incorrect scale!')
+                return
+        else:
+            arg = scale
+            msg = scale
+            if scale < 0: 
+                self._log_('Incorrect scale!')
+                return 
+                     
+            
+        self._log_('Setting figures scale to {}'.format(msg))
+        
+        jsfun = '''
+            function setScale(pScale) {    
+                var clsidFigure = 147; // figures
+                
+                var activeObjs = DS.Tree.AllObjects;
+                if (!activeObjs)
+                    return;
+
+                var numObjs = activeObjs.Count;
+
+                for (var i = 1; i <= numObjs; i++) {
+                    var objActive = activeObjs.Item(i);
+
+                    if (objActive && objActive.ID && (objActive.Class == clsidFigure))
+                    {
+                        DS.Graphics.Draw2(objActive.ID);
+
+                        if (!isNaN(pScale)) {       		   
+                            DS.Script.setTextResultScale(pScale);    			
+                        } else {
+                            var mode = 0;
+                            switch(pScale)
+                            {
+                                case "undef"   :
+                                    mode = 0;   // Undeformed
+                                    break;
+
+                                case "actual"  :
+                                    mode = 1;   // Actual
+                                    break;
+
+                                case "0.5auto" :
+                                    mode = 2;   // HalfAuto
+                                    break;
+
+                                case "auto"    :
+                                    mode = 3;   // Automatic
+                                    break;
+
+                                case "2auto"   :
+                                    mode = 4;   // TwiceAuto
+                                    break;
+
+                                case "5auto"   :
+                                    mode = 5;   // FiveAuto
+                                    break;
+
+                                default :
+                                    return;
+                            }
+                            DS.Script.setResultScale(mode);
+                        }                       
+                    }
+                }
+            }
+        '''
+    
+        jsmain = 'setScale({});'.format(arg)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -951,7 +1147,7 @@ class WBInterface(object):
         try:
             ext = os.path.basename(filename).split('.')[1]
         except:
-            self._log_('Error: Could not determine a file extention', 1)
+            self._log_('Error: Could not determine a file extention!', 1)
             return None
         else:
         
@@ -978,7 +1174,108 @@ class WBInterface(object):
                 self._log_(err_msg, 1) 
             else:
                 self._log_('Macro execution finished', 1)
-              
+    
+    @staticmethod
+    def __jsfun_savepics():
+        return '''
+            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode){                              
+                var numObjs = activeObjs.Count;
+                var image = DS.Graphics.ImageCaptureControl;
+                var clsidEnv = 105; // load cases
+                
+                switch (imode) 
+                {
+                    case 0:
+                        pExt = '.png';
+                        break;
+                    case 1:
+                        pExt = '.jpeg';
+                        break;
+                }
+                
+                var cntFigures = 0;
+                
+                for (var i = 1; i <= numObjs; i++) {
+                    var objActive = activeObjs.Item(i);
+
+                    if (objActive && objActive.ID && (objActive.Class == clsidObj))
+                    {
+                        DS.Graphics.Draw2(objActive.ID);
+                        
+                        if (pFit) {
+                            DS.Graphics.setisoview(7);
+                            DS.Script.doGraphicsFit();                           
+                        }
+                        
+                        if (!pName) {
+                            var picEnum = ("00" + cntFigures).slice (-3);
+                            var nameParent = (objActive.Parent.Name).replace(/ |_/g, '-');
+                            var nameFigure = (objActive.Name).replace(/ |_/g, '-');
+                            
+                            try {
+                                var objSearch = objActive.Parent;
+                                while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
+                                var nameSolution = (objSearch.Name).replace(/ |_/g, '-');
+                                nameSolution = nameSolution + "_";
+                            } catch (err) {
+                                var nameSolution = "";
+                            }
+                            nameFull = (pPref + "_" + picEnum + "_" + nameSolution + nameParent + "_" + nameFigure);
+                        } else {   
+                            nameFull = pName;
+                        } 
+                        // DS.Graphics.Redraw(1);
+                        image.Write(imode, pdir + nameFull + pExt);                      
+                        cntFigures++;
+                        if (pName) break;
+                    }
+                }
+            }
+            function prepocPicOutput(pHeight, pWidth, pFontFactor, col5, col6){
+                var gr_IMAGE2FILE = 0x16;
+                var gr_ImgResEnhanced = 0x1C;
+                var gr_FONTMAGFACTOR = 0x0;
+                
+                DS.Graphics.Info(gr_IMAGE2FILE) = -1;
+                DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = -1;
+                DS.Graphics.GfxUtility.Legend.iSImgResEnhanced = -1;
+                DS.Graphics.Info(gr_ImgResEnhanced) = -1;
+                DS.Graphics.InfoDouble(gr_FONTMAGFACTOR) = pFontFactor; 
+                if ((pHeight > 0) && (pWidth > 0)) {
+                    DS.Graphics.MemStreamHeight = pHeight;
+                    DS.Graphics.MemStreamWidth = pWidth;
+                }
+                
+                DS.Graphics.StreamMode = 1; 
+                
+                DS.Graphics.Scene.Color(1) = 0x00ffffff; //hex value for white - this will blend in with the ANSYS logo,
+                DS.Graphics.Scene.Color(2) = 0x00ffffff; //making the logo impossible to see.
+                DS.Graphics.Scene.Color(5) = col5; // HACK (restore color 5)
+                DS.Graphics.Scene.Color(6) = col6; // HACK (restore color 6)
+                
+            }
+            function postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom) 
+            {
+                var gr_IMAGE2FILE = 0x16;
+                var gr_ImgResEnhanced = 0x1C;
+                var gr_FONTMAGFACTOR = 0x0;
+                
+                DS.Graphics.Scene.Color(1) = prevColor1;
+                DS.Graphics.Scene.Color(2) = prevColor2;
+                DS.Graphics.Scene.Color(5) = prevColor5;
+                DS.Graphics.Scene.Color(6) = prevColor6;
+                DS.Graphics.LegendVisibility = prevLegend;
+                DS.Graphics.RulerVisibility = prevRuler;
+                DS.Graphics.TriadOn = prevTriad;
+                DS.Graphics.RandomColors = prevRandom;
+                             
+                DS.Graphics.Info(gr_IMAGE2FILE) = 0;
+                DS.Graphics.GfxUtility.Legend.IsFontSizeCustomized = 0;
+                DS.Graphics.GfxUtility.Legend.IsImgResEnhanced = 0;
+                DS.Graphics.Info(gr_ImgResEnhanced) = 0;
+                DS.Graphics.StreamMode = 0;  //so the geometry view will become visible again                                  
+            }           
+        '''
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
@@ -1001,7 +1298,7 @@ class WBInterface(object):
         # filename = os.path.join(filepath,'wb_mac.js')
         # with open(filename, 'w') as f:
             # f.write(code)
-        self._log_('JScript at: | System: "{}" | Component: "{}" |'.format(sys, comp))
+        self._log_('Running JScript at -> System: "{}", Component: "{}"'.format(sys, comp))
         
         ds_space = 'WB.AppletList.Applet("DSApplet").App.'
         code = code.replace('DS.', ds_space) 
