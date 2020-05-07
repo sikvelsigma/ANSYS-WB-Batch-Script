@@ -42,14 +42,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.1.2'
+__version__ = '2.1.3'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.1.2'
+    __version__ = '2.1.3'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -545,7 +545,12 @@ class WBInterface(object):
                 self._log_('Cannot generate Workbench report!', 1)
                 
             self._save_project()
-     
+    
+    def copy_from_userfiles(self, template_str, target):
+        self.copy_files(template_str, workbench.GetUserFilesDirectory() , target)
+        
+    def move_from_userfiles(self, template_str, target):
+        self.move_files(template_str, workbench.GetUserFilesDirectory() , target)
     # ---------------------------------------------------------------
     # JScript Methods
     # --------------------------------------------------------------- 
@@ -995,31 +1000,16 @@ class WBInterface(object):
             ignore_js_err: bool; wraps js main cammands in a try block
         """   
         strwrap = lambda x: '"{}"'.format(x)
+        undf_st = ('undef','undeformed')
         
         if isinstance(scale, str):
-            if scale == 'auto':
-                arg = strwrap(scale)
-                msg = 'auto'
-                
-            elif scale == '2auto':
-                arg = strwrap(scale)
-                msg = 'double auto'
-                
-            elif scale == '5auto':
-                arg = strwrap(scale)
-                msg = 'five auto'
-                
-            elif scale == 'undef' or scale == 'undeformed':
-                arg = strwrap(scale)
-                msg = 'undeformed'
-                
-            elif scale == '0.5auto':
-                arg = strwrap(scale)
-                msg = 'half auto'
-                
-            elif scale == 'actual':
-                arg = strwrap(scale)
-                msg = 'true scale'
+            arg = strwrap(scale)
+            if scale == 'auto'       : msg = 'auto'               
+            elif scale == '2auto'    : msg = 'double auto'               
+            elif scale == '5auto'    : msg = 'five auto'                
+            elif scale in undf_st    : msg = 'undeformed'               
+            elif scale == '0.5auto'  : msg = 'half auto'               
+            elif scale == 'actual'   : msg = 'true scale'
                 
             else:
                 self._log_('Incorrect scale!')
@@ -1043,7 +1033,8 @@ class WBInterface(object):
                     return;
 
                 var numObjs = activeObjs.Count;
-
+                DS.Graphics.StreamMode = 1; 
+                
                 for (var i = 1; i <= numObjs; i++) {
                     var objActive = activeObjs.Item(i);
 
@@ -1057,27 +1048,31 @@ class WBInterface(object):
                             var mode = 0;
                             switch(pScale)
                             {
-                                case "undef"   :
+                                case "undef"      :
+                                    mode = 0;   // Undeformed
+                                    break;
+                                    
+                                case "undeformed" :
                                     mode = 0;   // Undeformed
                                     break;
 
-                                case "actual"  :
+                                case "actual"     :
                                     mode = 1;   // Actual
                                     break;
 
-                                case "0.5auto" :
+                                case "0.5auto"    :
                                     mode = 2;   // HalfAuto
                                     break;
 
-                                case "auto"    :
+                                case "auto"       :
                                     mode = 3;   // Automatic
                                     break;
 
-                                case "2auto"   :
+                                case "2auto"      :
                                     mode = 4;   // TwiceAuto
                                     break;
 
-                                case "5auto"   :
+                                case "5auto"      :
                                     mode = 5;   // FiveAuto
                                     break;
 
@@ -1088,6 +1083,7 @@ class WBInterface(object):
                         }                       
                     }
                 }
+                DS.Graphics.StreamMode = 0; 
             }
         '''
     
@@ -1437,6 +1433,34 @@ class WBInterface(object):
         return dict(zip(keys, values))	
     
     @staticmethod
+    def copy_files(template, source_dir, target_dir):
+        srch_template = os.path.join(source_dir, template)
+        try:
+            srch = [f for f in glob(srch_template)]
+            f = srch[0]
+        except:
+            pass
+        else:
+            if not os.path.exists(target_dir): os.makedirs(target_dir)
+            for f in srch:
+                filename = os.path.basename(f)
+                shutil.copyfile(f, os.path.join(target_dir, filename))
+                
+    @staticmethod            
+    def move_files(template, source_dir, target_dir):
+        srch_template = os.path.join(source_dir, template)
+        try:
+            srch = [f for f in glob(srch_template)]
+            f = srch[0]
+        except:
+            pass
+        else:
+            if not os.path.exists(target_dir): os.makedirs(target_dir)
+            for f in srch:
+                filename = os.path.basename(f)
+                os.rename(f, os.path.join(target_dir, filename))
+                
+    @staticmethod
     def _listify(inp):	
         """Returns list of 1 items if input is not a list"""
         return inp if isinstance(inp, list) else [inp]
@@ -1465,7 +1489,7 @@ class WBInterface(object):
     @staticmethod
     def _bool_js(value):
         return 'true' if value else 'false'
-
+    
 #__________________________________________________________
 
 class NoActiveProjectFound(Exception):
