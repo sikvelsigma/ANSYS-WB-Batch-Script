@@ -16,8 +16,8 @@ from csv import writer as csvwriter
 from csv import QUOTE_MINIMAL
 
 from glob import glob 
-
 from time import sleep
+from System.Threading import Thread, ThreadStart
 # Import global from main to access Workbench commands
 import __main__ as workbench
 
@@ -42,14 +42,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '2.1.3'
+__version__ = '3.0.0'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '2.1.3'
+    __version__ = '3.0.0'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -98,21 +98,26 @@ class WBInterface(object):
         
     @property
     def isopen(self):
-        """Returns if there is an open Workbench project."""
+        """Returns if there is an opened Workbench project."""
         return self.__active
         
     @property
     def parameters(self):
-        """Returns IO parameters with values as dictionaries."""
+        """Returns IO parameters as dictionaries."""
         return (self._param_in_value, 	self._param_out_value)
-            
+        
+    @property
+    def failed_to_update(self):
+        """Returns if project failed to update"""
+        return self.__failed_to_update
+       
     # ---------------------------------------------------------------		
     # Magic methods
     # ---------------------------------------------------------------
     
     def __init__(self, logger = None, out_file='output.txt', full_report_file='full_report.txt', 
-                control_file_template='*_control.csv', input_file_template='*_input.csv', 
-                csv_delim=',', csv_skip='no', loginfo=None):
+                 control_file_template='*_control.csv', input_file_template='*_input.csv', csv_delim=',', 
+                 csv_skip='no', loginfo=None, apdl_log='APDL_output.txt', async_timer=0.5):
         """
         Constructor. All arguments have default values.
         
@@ -133,10 +138,8 @@ class WBInterface(object):
         log_prefix = '{}||'.format(str(self.__class__.__name__)) if loginfo is None else loginfo
         
         # Partial logger method with prefix at the start of every line
-        try:
-            self._log_ = partial(self._logger.log, info=log_prefix)
-        except:
-            self._log_ = self._logger.log
+        try: self._log_ = partial(self._logger.log, info=log_prefix)
+        except: self._log_ = self._logger.log
         
         self.log = self._logger.log					#: original logger method
         self._out_file = out_file					#: file for outputting
@@ -156,21 +159,32 @@ class WBInterface(object):
         self.__DPs_imported = 0						#: Design Points imported from input file
         self.__DPs_present = 0						#: Design Points already present in project
         self.__DPs = None
+        self.__failed_to_update = False
         
         self.__control_srch_default = '*.control'	#: in-build key string to search for cotrol file
         self.__input_srch_default = '*.input'		#: in-build  key string to search for input file
         
+        self.__apdl_log = apdl_log
+        
+        dir = os.path.join(os.getcwd(),'_ProjectScratch')
+        args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', sec=async_timer)
+        self.__async_log = AsyncLogChecker(**args)
+        
         self._log_('Class version: ' + self.__version__ , 1)
         
-        try:
-            self.runtime = self._logger.runtime
-        except:
-            self.runtime = None
+        try: self.runtime = self._logger.runtime
+        except: self.runtime = None
+        
     # --------------------------------------------------------------------        
     def __del__(self):   
         if self.__macro_dir_path and os.path.exists(__macro_dir_path):
             shutil.rmtree(self.__macro_dir_path, ignore_errors=True)
-
+    
+    def __bool__(self):
+        return self.__active
+        
+    def __str__(self):
+        return self.__workfile
     # ---------------------------------------------------------------		
     # Public methods
     # ---------------------------------------------------------------
@@ -431,32 +445,35 @@ class WBInterface(object):
         self._log_('Updating Workbench project...')
         self._log_('Check _ProjectScratch directory for solver logs')
         workbench.Parameters.ClearDesignPointsCache()
-        
+        self.__failed_to_update = False
         # skip_er = 'SkipDesignPoint' if skip_error else 'Stop'
         # skip_unc = 'Continue' if skip_uncomplete else 'Stop'
         
         self._param_out_value = defaultdict(list)
         
         try:
+            self.__async_log.is_solving = True
+            newthread = Thread(ThreadStart(self.__async_log.main))
+            newthread.Start()
             if self.__DPs_present == 1:
                 workbench.Update()
             else:
-                workbench.UpdateAllDesignPoints(DesignPoints=self.__DPs,
-                                             ErrorBehavior='SkipDesignPoint' if skip_error else 'Stop',
-                                             CannotCompleteBehavior='Continue' if skip_uncomplete else 'Stop')
-            # system1 = GetSystem(Name="SYS")
-            # component1 = system1.GetComponent(Name="Model")
-            # component1.Update(AllDependencies=True)
+                args = dict(DesignPoints=self.__DPs, ErrorBehavior='SkipDesignPoint' if skip_error else 'Stop',
+                            CannotCompleteBehavior='Continue' if skip_uncomplete else 'Stop')                          
+                workbench.UpdateAllDesignPoints(**args) 
+            self.__async_log.is_solving = False
+            
             if workbench.IsProjectUpToDate():
                 self._log_('Update successful', 1)
             else:
                 self._log_('Project is not up-to-date, see messages below')
                 for msg in workbench.GetMessages():
                     self._log_(msg.MessageType + ": " + msg.Summary)   
+                self._logger.blank()
         except Exception as err_msg:  
             self._log_('Project failed to update!')
             self._log_(err_msg, 1)
-            raise
+            self.__failed_to_update = True
         finally:
             self._save_project()
     # -------------------------------------------------------------------- 
@@ -1489,7 +1506,79 @@ class WBInterface(object):
     @staticmethod
     def _bool_js(value):
         return 'true' if value else 'false'
+
+#__________________________________________________________
+class AsyncLogChecker(object):
+    """
+    .NET
+    Class used for pulling info from APDL solver log files
+    Does not support concurrent APDL solvers!
+    """
+    __version__ = '0.0.1'
     
+    def __init__(self, outfile, watch_dir, watchfile='solve.out', sec=1):
+        self._logger = Logger('async.txt')    
+        log_prefix = '{}||'.format(str(self.__class__.__name__))
+        self._log_ = partial(self._logger.log, info=log_prefix) 
+        
+        self.outfile = outfile
+        self.dir = watch_dir
+        self.wait = sec*1000       
+        self.watchfile = watchfile
+        self.current_file = ''
+        self.current_position = 0
+             
+        self.is_solving = False     
+        with open(self.outfile, 'w') as f:
+            pass
+         
+    def main(self):
+        def doevents():
+            self._log_('Invoke log update watcher', 1)
+            print('Invoke log update watcher')
+            while self.is_solving: 
+                Thread.Sleep(self.wait)
+                if not os.path.exists(self.current_file): self.current_file = ''
+                if not self.current_file:
+                    if self.current_position:
+                        self._log_('Searching for new log file...')
+                        print('Searching for new log file...')
+                    self.current_position = 0
+                    
+                    file_list = self.reglob(self.dir, self.watchfile) 
+                    try: file = file_list[0]
+                    except: continue
+                    
+                    self.current_file = file
+                    self._log_('Found {}'.format(self.current_file))  
+                    print('Found {}'.format(self.current_file))  
+                    
+                with open(self.current_file, 'r') as f, open(self.outfile, 'a') as g:
+                    f.seek(self.current_position)
+                    newdata = f.read()
+                    self.current_position = f.tell()
+                    if newdata and newdata != '\n': 
+                        g.write(newdata)
+                        self._log_('File {} updated ({})'.format(self.outfile, len(newdata)))
+                        print('File {} updated ({})'.format(self.outfile, len(newdata)))
+                        
+        self._log_('Start watching {} for {} every {} sec'.format(self.dir, self.watchfile, self.wait/1000), 1)
+        print('Start watching {} for {} every {} sec'.format(self.dir, self.watchfile, self.wait/1000))
+        try: doevents()
+        finally: self._log_('Finished watching', 1); print('Finished watching')
+        
+    @staticmethod
+    def reglob(dir, srch):
+        file_list = []
+        for i in os.walk(dir):
+            c_dir = i[0]
+            c_template = os.path.join(c_dir, srch)
+            s = [f for f in glob(c_template)]
+            try: s = s[0]
+            except: continue
+            if s: file_list.append(s)
+        return file_list
+            
 #__________________________________________________________
 
 class NoActiveProjectFound(Exception):
