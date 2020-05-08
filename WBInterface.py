@@ -4,6 +4,7 @@ Note: Workbench uses IronPython (Python 2.7)!
 """
 #__________________________________________________________
 #__________________________________________________________
+from __future__ import print_function
 import os
 import shutil
 
@@ -19,6 +20,11 @@ from datetime import datetime
 from datetime import timedelta
 
 from System.Threading import Thread, ThreadStart
+
+import clr
+clr.AddReference("System.Management")
+from System.Management import ManagementObjectSearcher
+
 # Import global from main to access Workbench commands
 import __main__ as workbench
 
@@ -43,14 +49,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.1'
+__version__ = '3.0.2'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '3.0.1'
+    __version__ = '3.0.2'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -126,7 +132,26 @@ class WBInterface(object):
     def not_up_to_date(self):
         """Returns if project is not up-to-date"""
         return self.__not_up_to_date
-     
+        
+    @property
+    def ansys_version(self):
+        """Returns ANSYS version"""      
+        if 193 <= self.__ansys_version < 194:
+            return '2019R1'
+        elif 194 <= self.__ansys_version < 195:
+            return '2019R2'
+        elif 195 <= self.__ansys_version < 196:
+            return '2019R3'
+        elif 200 <= self.__ansys_version < 210:
+            return '2020R2'
+        else:
+            ver = str(self.__ansys_version).split('.')[0]
+            return ver[0:2] + '.' + ver[2:]
+    
+    @property
+    def _ansys_version(self):
+        """Returns ANSYS version number"""
+        return self.__ansys_version
     # ---------------------------------------------------------------		
     # Magic methods
     # ---------------------------------------------------------------
@@ -167,27 +192,36 @@ class WBInterface(object):
         self._input_file = None						#: csv file with input parameters
         self._control_srch = control_file_template	#: key string to search for cotrol file
         self._input_srch = input_file_template		#: key string to search for input file
-        self.__active = False						#: is a project open
         self._param_in = []							#: list of workbench input parameters
         self._param_out = []						#: list of workbench output parameters
         self._param_in_value = defaultdict(list)	#: dictionary with input parameters (keys=self._param_in)
         self._param_out_value = defaultdict(list)	#: dictionary with output parameters (keys=self._param_out)
         self._csv_delim = csv_delim					#: csv file delimiter
         self._csv_skip = csv_skip.lower()			#: string placeholder if no parameter is specified in csv file	
+        
         self.__workfile = None						#: opened workbench project
         self.__DPs_imported = 0						#: Design Points imported from input file
         self.__DPs_present = 0						#: Design Points already present in project
         self.__DPs = None
         
+        self.__active = False						
         self.__failed_to_update = False
         self.__solved = False
         self.__failed_to_open = False
         self.__not_up_to_date = False
         
-        self.__control_srch_default = '*.control'	#: in-build key string to search for cotrol file
-        self.__input_srch_default = '*.input'		#: in-build  key string to search for input file
+        ver = workbench.GetFrameworkBuildVersion().split('.')
+        self.__ansys_version = float(''.join(ver[0:2]) + '.' + ''.join(ver[2:]))
+        self._log_('ANSYS Workbench: %s' % self.ansys_version, 1)
+        
+        self.__control_srch_default = '*.control'	#: default key string to search for cotrol file
+        self.__input_srch_default = '*.input'		#: default key string to search for input file
         
         self.__apdl_log = apdl_log
+        
+        searcher = ManagementObjectSearcher("Select * from Win32_Processor").Get()
+        for i in searcher:
+            self.__machine_core_count = int(i["NumberOfCores"])
         
         dir = os.path.join(os.getcwd(),'_ProjectScratch')
         if async_timer:
@@ -201,6 +235,7 @@ class WBInterface(object):
         
         try: self.runtime = self._logger.runtime
         except: self.runtime = None
+        
         
     # --------------------------------------------------------------------        
     def __del__(self):   
@@ -496,7 +531,7 @@ class WBInterface(object):
         self._log_('Success', 1)
         if saveproject: self._save_project()
     # --------------------------------------------------------------------     
-    def update_project(self, skip_error=True, skip_uncomplete=True, save_after_update=True):
+    def update_project(self, skip_error=True, skip_uncomplete=True, save=True):
         """Update Workbench project."""
         if not self.__active:
             self._log_('Cannot update project: No active project found!', 1)
@@ -526,7 +561,7 @@ class WBInterface(object):
         finally:
             self.__solved = True
             self.stop_logwatch()
-            if save_after_update: self._save_project()                      
+            if save: self._save_project()                      
         
         sol_time = datetime.now() - start_time
         sol_time = timedelta(days=sol_time.days, seconds=sol_time.seconds, microseconds=0)
@@ -544,13 +579,14 @@ class WBInterface(object):
     # --------------------------------------------------------------------    
     def status(self):
         """Writes project status to log file"""
+        msg = 'Solution Status: '
         if self.__active:
-            if self.__failed_to_update: self._log_('Status: FAILED TO UPDATE!')
-            elif self.__not_up_to_date: self._log_('Status: NOT UP-TO-DATE')
-            elif self.__solved: self._log_('Status: SOLVE SUCCESSFUL')
-            else: self._log_('Status: NOT SOLVED')
-        elif self.__failed_to_open: self._log_('Status: FAILED TO OPEN')
-        else: self._log_('Status: NOT OPENED')
+            if self.__failed_to_update: self._log_(msg + 'FAILED TO UPDATE!')
+            elif self.__not_up_to_date: self._log_(msg + 'NOT UP-TO-DATE')
+            elif self.__solved: self._log_(msg + 'SOLVE SUCCESSFUL')
+            else: self._log_(msg + 'NOT SOLVED')
+        elif self.__failed_to_open: self._log_(msg + 'FAILED TO OPEN')
+        else: self._log_(msg + 'NOT OPENED')
         
     def fatal_error(self, msg):
         """Method to write a fatal error to log"""
@@ -658,10 +694,11 @@ class WBInterface(object):
         
     def move_from_userfiles(self, template_str, target):
         self.move_files(template_str, workbench.GetUserFilesDirectory() , target)
+        
     # ---------------------------------------------------------------
-    # JScript Methods
+    # JScript Wrappers
     # --------------------------------------------------------------- 
-    def set_cores_number(self, container, value, module='Model', ignore_js_err=True):
+    def set_cores_number(self, container, value=0, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
         Sets number of cores in Mechanical. 
@@ -675,13 +712,25 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
+        if self.__ansys_version < 194:
+            self._log_('Cannot change number of cores')
+            self._log_('Older ANSYS versions do not support this function!', 1)
+            return False
+        
+        if not value: 
+            value = self.__machine_core_count
+            self._log_('Requesting maximum number of cores on this machine')
+        
         if not isinstance(value, int) or value < 0:
             self._log_('Error: Attempted to set incorrect number of cores: {}'.format(value))
             self._log_('Number of cores used unchanged!', 1)
-            return
+            return False
+        
+        if value > self.__machine_core_count:
+            self._log_('Error: Cannot set number of cores bigger than %s on this machine' % self.__machine_core_count)
+            value = self.__machine_core_count
             
         self._log_('Setting number of cores to {}'.format(value))
-        self._log_('Do not set this number higher than a number of physical cores on a machine!'.format(value))
         
         # jscode = 'DS.Script.Configure_setNumberOfCores("{}")'.format(value)
         
@@ -717,8 +766,9 @@ class WBInterface(object):
             self._send_js_macro(container, jscode, module)
         except Exception as err_msg:
             self._log_('An error occured!')
-            self._log_('Your ANSYS might use old interface')
             self._log_(err_msg, 1)
+            return False
+        else: return True
         
     # -------------------------------------------------------------------- 
     def set_distributed(self, container, value, module='Model', ignore_js_err=True):
@@ -735,6 +785,11 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
+        if self.__ansys_version < 194:
+            self._log_('Cannot change solver parallel method')
+            self._log_('Older ANSYS versions do not support this function!', 1)
+            return False
+        
         value_js = self._bool_js(value)
         if value_js == 'true':
             self._log_('Distributed solver: Enabled')
@@ -768,8 +823,9 @@ class WBInterface(object):
             self._send_js_macro(container, jscode, module)
         except Exception as err_msg:
             self._log_('An error occured!')
-            self._log_('Your ANSYS might use old interface')
             self._log_(err_msg, 1)
+            return False
+        else: return True
     
     # -------------------------------------------------------------------- 
     def save_overview(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
@@ -1065,6 +1121,11 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """       
+        if self.__ansys_version < 194:
+            self._log_('Cannot change unit system')
+            self._log_('Older ANSYS versions do not support this function!', 1)
+            return False
+        
         if unit_sys == 'MKS': 
             unit_sys_id = 0
             unit_msg = 'Metric (m, kg, N, s, V, A)'
@@ -1128,6 +1189,11 @@ class WBInterface(object):
                 '0.5auto', 'auto', '2auto', '5auto', 'undef', 'actual'
             ignore_js_err: bool; wraps js main cammands in a try block
         """   
+        if self.__ansys_version < 194:
+            self._log_('Cannot change figure scaling')
+            self._log_('Older ANSYS versions do not support this function!', 1)
+            return False
+        
         strwrap = lambda x: '"{}"'.format(x)
         undf_st = ('undef','undeformed')
         
@@ -1258,7 +1324,9 @@ class WBInterface(object):
             self._log_('"send_act_macro()" METHOD IS A PLACEHOLDER')
             return False              
                
-        self.send_act_macfile(sys, tempfile, comp, ignore_js_err=False)       
+        self.send_act_macfile(sys, tempfile, comp, ignore_js_err=False)
+        
+        return True
         
     # --------------------------------------------------------------------     
     def send_act_macfile(self, mech_sys, filename, mech_comp='Model', ignore_js_err=False): 
@@ -1405,12 +1473,17 @@ class WBInterface(object):
                 DS.Graphics.StreamMode = 0;  //so the geometry view will become visible again                                  
             }           
         '''
+    
+    def send_js_macro(self, system, macro, component='Model', gui=False):
+        """Use this to send commands to systems, calls Workbench SendCommand()"""
+        self._log_('Sending macros to Workbench system')
+        self._send_js_macro(system, macro, comp=component, visible=gui)
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
     def _send_js_macro(self, sys, code, comp='Model', visible=False):
         """
-        Executes JS macro in Mechanical. This method is used for all interactions with Mechanical.
+        Executes JS macro. This method is used for all interactions with Mechanical.
         
         Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
         This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
@@ -1633,61 +1706,64 @@ class WBInterface(object):
 class AsyncLogChecker(object):
     """
     .NET
-    Class used for pulling info from APDL solver log files
-    Does not support concurrent APDL solvers!
+    Class used for pulling text from files.
+    Does not support pulling info from several concurrent files!
+    Arg:
+        outfile: str
+        watch_dir: str; upper level dir, watch file will be searched in all child dirs
+        watchfile: str; search for this file, supports template string
+        timer: float; check for updates each <timer> seconds
+        logger: Logger class
+        divider: bool; print divider between files
     """
-    __version__ = '0.0.2'
+    __version__ = '0.0.4'
     
-    def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None):            
-        
+    # ---------------------------------------------------------------		
+    # Magic methods
+    # ---------------------------------------------------------------
+    
+    def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None,
+                 div_symbol='=', div_length=60, console=True):            
+                    
         self._logger = logger if logger is not None else Logger('logchecker.txt')
         log_prefix = '{}||'.format(str(self.__class__.__name__))
 
-        self._log_ = partial(self._logger.log, info=log_prefix)     
+        self._log_ = partial(self._logger.log, info=log_prefix) 
+        
         self.outfile = outfile
         self.dir = watch_dir
         self.wait = timer*1000       
         self.watchfile = watchfile
-        self.current_file = ''
-        self.current_position = 0
+
         self._thread = None     
         self._log_('Class version: ' + self.__version__ , 1)
-             
-        self.__is_watching = False     
-        with open(self.outfile, 'w') as f: pass
-         
-    def main(self):
-        def doevents():
-            while self.__is_watching: 
-                Thread.Sleep(self.wait)
-                if not os.path.exists(self.current_file): self.current_file = ''
-                if not self.current_file:
-                    if self.current_position:
-                        self._logger.blank()
-                        self._log_('Searching for new watch file...')
-                    self.current_position = 0
-                    
-                    file_list = self.re_glob(self.dir, self.watchfile) 
-                    try: file = file_list[0]
-                    except: continue
-                    
-                    self.current_file = file
-                    self._log_('Found: {}'.format(self.current_file))  
-                    
-                with open(self.current_file, 'r') as f, open(self.outfile, 'a') as g:
-                    f.seek(self.current_position)
-                    newdata = f.read()
-                    self.current_position = f.tell()
-                    if newdata and newdata != '\n': 
-                        g.write(newdata)
-                        self._log_('New update ({})'.format(len(newdata)))                              
-        try: doevents()
-        except: pass
+        self._div_symbol = div_symbol
+        self._div_length = div_length
+        self._console = console
         
+        self.__current_file = ''
+        self.__current_position = 0     
+        self.__is_watching = False 
+            
+        
+        with open(self.outfile, 'w') as f: pass
+                   
+    # ---------------------------------------------------------------		
+    # Public methods
+    # ---------------------------------------------------------------
+    
+    def stop(self):
+        """Stop watching"""
+        if not self.__is_watching: self._log_('Cannot execute stop command: watcher is inactive!')
+        else: 
+            self._log_('Finished watching', 1)
+            self.__is_watching = False
+               
     def start(self):
+        """Start watching file for updates"""
         if not self.__is_watching:
             self.__is_watching = True
-            self._thread = Thread(ThreadStart(self.main))
+            self._thread = Thread(ThreadStart(self.__main))
             self._log_('Start watching every {} sec'.format(self.wait/1000))
             self._log_('Watch directory: {}'.format(self.dir))
             self._log_('Watch for: {}'.format(self.watchfile))
@@ -1696,12 +1772,57 @@ class AsyncLogChecker(object):
             self._thread.Start()
         else:
             self._log_('Thread is already running!')
+            
+    # ---------------------------------------------------------------		
+    # Private methods
+    # ---------------------------------------------------------------
+    
+    def __main(self):
+        """Main execution function"""
+        def msg_end(num, symbol, s_len):
+            """Divider message"""
+            msg_main = 'FILE %s END' % num
+            msg_div = symbol * (s_len*2 + len(msg_main)) + '\n'
+            msg_brace = symbol * s_len 
+
+            return '\n\n' + msg_div + msg_brace + msg_main + msg_brace + '\n' + msg_div + '\n'
+    
+        def doevents():
+            """Main event loop"""
+            file_cnt = 0
+            while self.__is_watching: 
+                Thread.Sleep(self.wait)
+                if not os.path.exists(self.__current_file): self.__current_file = ''
+                if not self.__current_file:
+                    if self.__current_position:
+                        self._logger.blank()
+                        self._log_('Searching for new watch file...')
+                        if self._div_symbol:
+                            args = dict(num=file_cnt, symbol=self._div_symbol, s_len=self._div_length)
+                            with open(self.outfile, 'a') as g: g.write(msg_end(**args))
+                            
+                    self.__current_position = 0
+                    
+                    file_list = self.re_glob(self.dir, self.watchfile) 
+                    try: file = file_list[0]
+                    except: continue
+                    
+                    self.__current_file = file
+                    self._log_('Found: {}'.format(self.__current_file))  
+                    file_cnt += 1
+                    
+                with open(self.__current_file, 'r') as f, open(self.outfile, 'a') as g:
+                    f.seek(self.__current_position)
+                    newdata = f.read()
+                    self.__current_position = f.tell()
+                    if newdata and newdata != '\n': 
+                        g.write(newdata)
+                        self._log_('New update ({})'.format(len(newdata))) 
+                        if self._console: print(newdata, end='')
+        try: doevents()
+        except: pass
         
-    def stop(self):
-        if not self.__is_watching: self._log_('Cannot execute stop command: watcher is inactive!')
-        else: 
-            self._log_('Finished watching', 1)
-            self.__is_watching = False
+
     
     @staticmethod
     def re_glob(dir, srch):
