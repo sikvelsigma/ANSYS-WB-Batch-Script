@@ -6,7 +6,7 @@ Note: Workbench uses IronPython (Python 2.7)!
 #__________________________________________________________
 import os
 import shutil
-# import csv
+
 from glob import glob
 from functools import partial 
 from collections import defaultdict
@@ -15,8 +15,9 @@ from csv import reader as csvreader
 from csv import writer as csvwriter
 from csv import QUOTE_MINIMAL
 
-from glob import glob 
-from time import sleep
+from datetime import datetime
+from datetime import timedelta
+
 from System.Threading import Thread, ThreadStart
 # Import global from main to access Workbench commands
 import __main__ as workbench
@@ -42,14 +43,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.0'
+__version__ = '3.0.1'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '3.0.0'
+    __version__ = '3.0.1'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -110,14 +111,29 @@ class WBInterface(object):
     def failed_to_update(self):
         """Returns if project failed to update"""
         return self.__failed_to_update
-       
+    
+    @property
+    def solved(self):
+        """Returns if project is solved"""
+        return self.__solved
+        
+    @property
+    def failed_to_open(self):
+        """Returns if project failed to open"""
+        return self.__failed_to_open
+        
+    @property
+    def not_up_to_date(self):
+        """Returns if project is not up-to-date"""
+        return self.__not_up_to_date
+     
     # ---------------------------------------------------------------		
     # Magic methods
     # ---------------------------------------------------------------
     
     def __init__(self, logger = None, out_file='output.txt', full_report_file='full_report.txt', 
                  control_file_template='*_control.csv', input_file_template='*_input.csv', csv_delim=',', 
-                 csv_skip='no', loginfo=None, apdl_log='APDL_output.txt', async_timer=0.5):
+                 csv_skip='no', loginfo=None, apdl_log='APDL_output.txt', async_timer=None):
         """
         Constructor. All arguments have default values.
         
@@ -141,7 +157,10 @@ class WBInterface(object):
         try: self._log_ = partial(self._logger.log, info=log_prefix)
         except: self._log_ = self._logger.log
         
+        self._log_('Class version: ' + self.__version__ , 1)
+        
         self.log = self._logger.log					#: original logger method
+        self.blank = self._logger.blank
         self._out_file = out_file					#: file for outputting
         self._full_file = full_report_file			#: file for workbench parametric report
         self._control_file = None					#: csv file with io parameter list
@@ -159,7 +178,11 @@ class WBInterface(object):
         self.__DPs_imported = 0						#: Design Points imported from input file
         self.__DPs_present = 0						#: Design Points already present in project
         self.__DPs = None
+        
         self.__failed_to_update = False
+        self.__solved = False
+        self.__failed_to_open = False
+        self.__not_up_to_date = False
         
         self.__control_srch_default = '*.control'	#: in-build key string to search for cotrol file
         self.__input_srch_default = '*.input'		#: in-build  key string to search for input file
@@ -167,10 +190,14 @@ class WBInterface(object):
         self.__apdl_log = apdl_log
         
         dir = os.path.join(os.getcwd(),'_ProjectScratch')
-        args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', sec=async_timer)
+        if async_timer:
+            args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', timer=async_timer, logger=self._logger)
+        else:
+            args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', logger=self._logger)
+
         self.__async_log = AsyncLogChecker(**args)
-        
-        self._log_('Class version: ' + self.__version__ , 1)
+        self.start_logwatch = self.__async_log.start
+        self.stop_logwatch = self.__async_log.stop
         
         try: self.runtime = self._logger.runtime
         except: self.runtime = None
@@ -300,6 +327,15 @@ class WBInterface(object):
                     self.__DPs_imported = len(self._param_in_value[self._param_in[0]])
                     self._log_('Reading successful: ' + str(self.__DPs_imported) + ' Design Point(s) found', 1)
                     break
+    # -------------------------------------------------------------------- 
+    def find_and_import_parameters(self, control_file=None, input_file=None):
+        """
+        Automatically find and set parameters in Workbench
+        """
+        self.read_control(control_file_template=control_file)
+        self.read_input(input_file_template=input_file)
+        self.import_parameters()
+    
     # --------------------------------------------------------------------                 
     def input_by_name(self, inp):
         """
@@ -361,27 +397,30 @@ class WBInterface(object):
             wbpz_file = file_list[0]
         except Exception as err_msg:
             self._log_('Archive not found!', 1)
-            raise
+            self.__failed_to_open = True
+            return False
         
         self.__workfile = wbpz_file.replace('.wbpz','.wbpj')
         
         self._log_('Archive found: ' + self.__workfile, 1)
         self._log_('Unpacking archive...')
         
-        try: 
-            workbench.Unarchive(ArchivePath=wbpz_file,
-                              ProjectPath=self.__workfile,
-                              Overwrite=True)
+        try:
+            args = dict(ArchivePath=wbpz_file, ProjectPath=self.__workfile, Overwrite=True)
+            workbench.Unarchive(**args)
             workbench.ClearMessages()
         except Exception as err_msg:
             self._log_('Unpacking failed!')
             self._log_(err_msg, 1)
-            raise
-            
+            self.__failed_to_open = True
+            return False
+        
+        self.__failed_to_open = False
         self.__active = True
         self.__DPs = self._get_DPs()
         self.__DPs_present = len(self.__DPs)
         self._log_('Unpacking successful!', 1)
+        return True
     # --------------------------------------------------------------------             
     def open_project(self, project='*.wbpj', refresh=False):		
         """Search for Workbench project in working directory and open it."""
@@ -391,7 +430,8 @@ class WBInterface(object):
             wbpj_file = file_list[0]
         except Exception as err_msg:
             self._log_('Project not found!', 1)
-            raise
+            self.__failed_to_open = True
+            return False
             
         self.__workfile = wbpj_file
         
@@ -404,22 +444,42 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('Opening failed!')
             self._log_(err_msg, 1)
-            raise
+            self.__failed_to_open = True
+            return False
             
+        self.__failed_to_open = False
         self.__active = True
         self.__DPs = self._get_DPs()
         self.__DPs_present = len(self.__DPs)
-        self._log_('Success', 1)		
+        self._log_('Success', 1)
+        return True
+    # --------------------------------------------------------------------
+    def open_any(self, archive_first=True, arch='*.wbpz', prj='*.wbpj'):
+        if archive_first: 
+            open_1 = partial(self.open_archive, archive=arch)
+            open_2 = partial(self.open_project, project=prj)
+        else: 
+            open_1 = partial(self.open_project, project=prj)
+            open_2 = partial(self.open_archive, archive=arch)      
+        
+        if not open_1(): open_2()
+        if self.__failed_to_open: self._log_('Nothing to open!')
+
     # -------------------------------------------------------------------- 
+    def import_parameters(self, save=True):
+        """Use this method instead of set_parameters()"""
+        self.set_parameters(saveproject=save)
+    
     def set_parameters(self, saveproject=True):
         """Set imported parameters into Workbench."""
+        if not self.__active:
+            self._log_('Cannot set parameters: No active project found!', 1)
+            raise NoActiveProjectFound
+        
         self._log_('Setting Workbench parameters...')
-        if self.__active and self.__DPs_imported <= 0:
+        if self.__DPs_imported <= 0:
             self._log_('No parameters to set!', 1)
             return
-        elif not self.__active:
-            self._log_('Cannot set parameters: No active project found!', 1)
-            raise
         
         self._clear_DPs()
         while self.__DPs_imported > self.__DPs_present:
@@ -436,46 +496,71 @@ class WBInterface(object):
         self._log_('Success', 1)
         if saveproject: self._save_project()
     # --------------------------------------------------------------------     
-    def update_project(self, skip_error=True, skip_uncomplete=True):
+    def update_project(self, skip_error=True, skip_uncomplete=True, save_after_update=True):
         """Update Workbench project."""
         if not self.__active:
             self._log_('Cannot update project: No active project found!', 1)
             raise NoActiveProjectFound
             
-        self._log_('Updating Workbench project...')
-        self._log_('Check _ProjectScratch directory for solver logs')
+        self._log_('Updating Workbench project...', 1)
         workbench.Parameters.ClearDesignPointsCache()
         self.__failed_to_update = False
-        # skip_er = 'SkipDesignPoint' if skip_error else 'Stop'
-        # skip_unc = 'Continue' if skip_uncomplete else 'Stop'
+        self.__solved = False
+        self.__not_up_to_date = False
         
         self._param_out_value = defaultdict(list)
-        
-        try:
-            self.__async_log.is_solving = True
-            newthread = Thread(ThreadStart(self.__async_log.main))
-            newthread.Start()
-            if self.__DPs_present == 1:
-                workbench.Update()
+             
+        self.start_logwatch()
+        start_time = datetime.now()
+        try:                     
+            if self.__DPs_present == 1: workbench.Update()
             else:
-                args = dict(DesignPoints=self.__DPs, ErrorBehavior='SkipDesignPoint' if skip_error else 'Stop',
-                            CannotCompleteBehavior='Continue' if skip_uncomplete else 'Stop')                          
+                args = dict(ErrorBehavior='SkipDesignPoint' if skip_error else 'Stop',
+                            CannotCompleteBehavior='Continue' if skip_uncomplete else 'Stop',
+                            DesignPoints=self.__DPs)                          
                 workbench.UpdateAllDesignPoints(**args) 
-            self.__async_log.is_solving = False
-            
-            if workbench.IsProjectUpToDate():
-                self._log_('Update successful', 1)
-            else:
-                self._log_('Project is not up-to-date, see messages below')
-                for msg in workbench.GetMessages():
-                    self._log_(msg.MessageType + ": " + msg.Summary)   
-                self._logger.blank()
         except Exception as err_msg:  
             self._log_('Project failed to update!')
             self._log_(err_msg, 1)
             self.__failed_to_update = True
         finally:
-            self._save_project()
+            self.__solved = True
+            self.stop_logwatch()
+            if save_after_update: self._save_project()                      
+        
+        sol_time = datetime.now() - start_time
+        sol_time = timedelta(days=sol_time.days, seconds=sol_time.seconds, microseconds=0)
+        self._log_('Elapsed solution time: {}'.format(sol_time) ,)
+        
+        if workbench.IsProjectUpToDate():
+            self._log_('Update successful', 1)
+        else:
+            self.__not_up_to_date = True
+            self._log_('Project is not up-to-date, see messages below')
+            for msg in workbench.GetMessages():
+                self._log_(msg.MessageType + ": " + msg.Summary)   
+            self._logger.blank()
+        return True
+    # --------------------------------------------------------------------    
+    def status(self):
+        """Writes project status to log file"""
+        if self.__active:
+            if self.__failed_to_update: self._log_('Status: FAILED TO UPDATE!')
+            elif self.__not_up_to_date: self._log_('Status: NOT UP-TO-DATE')
+            elif self.__solved: self._log_('Status: SOLVE SUCCESSFUL')
+            else: self._log_('Status: NOT SOLVED')
+        elif self.__failed_to_open: self._log_('Status: FAILED TO OPEN')
+        else: self._log_('Status: NOT OPENED')
+        
+    def fatal_error(self, msg):
+        """Method to write a fatal error to log"""
+        self._log_('FATAL ERROR')
+        self._log_(msg)
+        
+    def issue_end(self):
+        """Call this at the end of your script"""
+        self._log_('END RUN')
+        self.runtime()
     # -------------------------------------------------------------------- 
     def set_output(self, out_par=None):
         """
@@ -497,6 +582,9 @@ class WBInterface(object):
         self._log_('Success: {} outputs specified'.format(len(self._param_out)), 1)
     # -------------------------------------------------------------------- 
     def save_project(self):
+        if not self.__active:
+            self._log_('Cannot save project: No active project found!', 1)
+            raise NoActiveProjectFound 
         workbench.Save(Overwrite=True)
         self._log_('Project Saved', 1)
     # --------------------------------------------------------------------
@@ -506,6 +594,10 @@ class WBInterface(object):
         output to a file.
         
         """
+        if not self.__active:
+            self._log_('Cannot output parameters: No active project found!', 1)
+            raise NoActiveProjectFound 
+            
         if output_file_name is None: output_file_name=self._out_file
         if full_report_file is None: full_report_file=self._full_file
         if csv_delim is None: csv_delim=self._csv_delim
@@ -517,9 +609,7 @@ class WBInterface(object):
         if not self._param_out:
             self._log_('No parameters to output!', 1)
             return
-        elif not self.__active:
-            self._log_('Cannot output parameters: No active project found!', 1)
-            raise NoActiveProjectFound
+            
             
         self._param_out_value = defaultdict(list)
         self._log_('Retrieving output parameters... ')
@@ -695,17 +785,20 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
-        try:
-            basename, ext = filename.split('.')
+        if width < 0 or height < 0 or fontfact < 0:
+            self._log_('Incorrect picture parameters!')
+            return False
+        
+        try: basename, ext = filename.split('.')
         except:
             self._log_('Error: Could not determine a file extention!', 1)
-            return None
+            return False
         
         if ext == 'png': mode = 0
         elif ext == 'jpg' or ext == 'jpeg': mode = 1
         else:
             self._log_('Unsupported file extention!', 1)
-            return None
+            return False
         
         self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
         if not os.path.exists(fpath): os.makedirs(fpath)
@@ -753,6 +846,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
+            return False
+        else: return True
     # -------------------------------------------------------------------- 
     def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
         """
@@ -766,17 +861,20 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
-        try:
-            basename, ext = filename.split('.')
+        if width < 0 or height < 0 or fontfact < 0:
+            self._log_('Incorrect picture parameters!')
+            return False
+        
+        try: basename, ext = filename.split('.')
         except:
             self._log_('Error: Could not determine a file extention!', 1)
-            return None
+            return False
         
         if ext == 'png': mode = 0
         elif ext == 'jpg' or ext == 'jpeg': mode = 1
         else:
             self._log_('Unsupported file extention!', 1)
-            return None
+            return False
         
         self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
         if not os.path.exists(fpath): os.makedirs(fpath)
@@ -824,6 +922,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
+            return False
+        else: return True
        
     def save_setups_view(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
         """
@@ -835,7 +935,11 @@ class WBInterface(object):
             fpath: str; save directory
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
-        """  
+        """
+        if width < 0 or height < 0 or fontfact < 0:
+            self._log_('Incorrect picture parameters!')
+            return False
+        
         self._log_('Saving all environment setups in {}'.format(fpath))      
         if not os.path.exists(fpath): os.makedirs(fpath)
         
@@ -880,7 +984,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
-
+            return False
+        else: return True
         
     # -------------------------------------------------------------------- 
     def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
@@ -894,6 +999,10 @@ class WBInterface(object):
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
+        if width < 0 or height < 0 or fontfact < 0:
+            self._log_('Incorrect picture parameters!')
+            return False
+        
         self._log_('Saving all figures in {}'.format(fpath))
         
         if not os.path.exists(fpath): os.makedirs(fpath)
@@ -940,7 +1049,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
-     
+            return False
+        else: return True
    
     # -------------------------------------------------------------------- 
     def set_unit_system(self, container, unit_sys, module='Model', ignore_js_err=True):
@@ -981,7 +1091,7 @@ class WBInterface(object):
             unit_msg = 'Metric (mm, dat, N, s, mV, mA)'
         else: 
             self._log_('Cannot set unit system: unknown system ID = {}'.format(unit_sys), 1)
-            return
+            return False
         
         self._log_('Setting units to {}: {}'.format(unit_sys, unit_msg))
         
@@ -1003,6 +1113,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
+            return False
+        else: return True
         # -------------------------------------------------------------------- 
     def set_figures_scale(self, container, scale, module='Model', ignore_js_err=True):
         """
@@ -1030,13 +1142,13 @@ class WBInterface(object):
                 
             else:
                 self._log_('Incorrect scale!')
-                return
+                return False
         else:
             arg = scale
             msg = scale
             if scale < 0: 
                 self._log_('Incorrect scale!')
-                return 
+                return False
                      
             
         self._log_('Setting figures scale to {}'.format(msg))
@@ -1114,6 +1226,8 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
+            return False
+        else: return True
     # -------------------------------------------------------------------- 
     def send_act_macro(self, sys, code, ext='py', comp='Model'): 
         """
@@ -1142,7 +1256,7 @@ class WBInterface(object):
                
         with open(tempfile, 'w') as f:
             self._log_('"send_act_macro()" METHOD IS A PLACEHOLDER')
-            return None              
+            return False              
                
         self.send_act_macfile(sys, tempfile, comp, ignore_js_err=False)       
         
@@ -1161,7 +1275,7 @@ class WBInterface(object):
             ext = os.path.basename(filename).split('.')[1]
         except:
             self._log_('Error: Could not determine a file extention!', 1)
-            return None
+            return False
         else:
         
             if ext == 'py': logext = 'Python'
@@ -1185,8 +1299,10 @@ class WBInterface(object):
             except Exception as err_msg:
                 self._log_('An error occured!')
                 self._log_(err_msg, 1) 
+                return False
             else:
                 self._log_('Macro execution finished', 1)
+                return True
     
     @staticmethod
     def __jsfun_savepics():
@@ -1311,6 +1427,10 @@ class WBInterface(object):
         # filename = os.path.join(filepath,'wb_mac.js')
         # with open(filename, 'w') as f:
             # f.write(code)
+        if not self.__active:
+            self._log_('Cannot send js macro: No active project found!', 1)
+            raise NoActiveProjectFound
+        
         self._log_('Running JScript at -> System: "{}", Component: "{}"'.format(sys, comp))
         
         ds_space = 'WB.AppletList.Applet("DSApplet").App.'
@@ -1325,8 +1445,10 @@ class WBInterface(object):
         except Exception as err_msg:
             self._log_('An error occured!')
             self._log_(err_msg, 1) 
+            return False
         else:
             self._log_('Finished', 1)
+            return True
     
     def _clear_DPs(self):
         
@@ -1514,44 +1636,43 @@ class AsyncLogChecker(object):
     Class used for pulling info from APDL solver log files
     Does not support concurrent APDL solvers!
     """
-    __version__ = '0.0.1'
+    __version__ = '0.0.2'
     
-    def __init__(self, outfile, watch_dir, watchfile='solve.out', sec=1):
-        self._logger = Logger('async.txt')    
-        log_prefix = '{}||'.format(str(self.__class__.__name__))
-        self._log_ = partial(self._logger.log, info=log_prefix) 
+    def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None):            
         
+        self._logger = logger if logger is not None else Logger('logchecker.txt')
+        log_prefix = '{}||'.format(str(self.__class__.__name__))
+
+        self._log_ = partial(self._logger.log, info=log_prefix)     
         self.outfile = outfile
         self.dir = watch_dir
-        self.wait = sec*1000       
+        self.wait = timer*1000       
         self.watchfile = watchfile
         self.current_file = ''
         self.current_position = 0
+        self._thread = None     
+        self._log_('Class version: ' + self.__version__ , 1)
              
-        self.is_solving = False     
-        with open(self.outfile, 'w') as f:
-            pass
+        self.__is_watching = False     
+        with open(self.outfile, 'w') as f: pass
          
     def main(self):
         def doevents():
-            self._log_('Invoke log update watcher', 1)
-            print('Invoke log update watcher')
-            while self.is_solving: 
+            while self.__is_watching: 
                 Thread.Sleep(self.wait)
                 if not os.path.exists(self.current_file): self.current_file = ''
                 if not self.current_file:
                     if self.current_position:
-                        self._log_('Searching for new log file...')
-                        print('Searching for new log file...')
+                        self._logger.blank()
+                        self._log_('Searching for new watch file...')
                     self.current_position = 0
                     
-                    file_list = self.reglob(self.dir, self.watchfile) 
+                    file_list = self.re_glob(self.dir, self.watchfile) 
                     try: file = file_list[0]
                     except: continue
                     
                     self.current_file = file
-                    self._log_('Found {}'.format(self.current_file))  
-                    print('Found {}'.format(self.current_file))  
+                    self._log_('Found: {}'.format(self.current_file))  
                     
                 with open(self.current_file, 'r') as f, open(self.outfile, 'a') as g:
                     f.seek(self.current_position)
@@ -1559,16 +1680,31 @@ class AsyncLogChecker(object):
                     self.current_position = f.tell()
                     if newdata and newdata != '\n': 
                         g.write(newdata)
-                        self._log_('File {} updated ({})'.format(self.outfile, len(newdata)))
-                        print('File {} updated ({})'.format(self.outfile, len(newdata)))
-                        
-        self._log_('Start watching {} for {} every {} sec'.format(self.dir, self.watchfile, self.wait/1000), 1)
-        print('Start watching {} for {} every {} sec'.format(self.dir, self.watchfile, self.wait/1000))
+                        self._log_('New update ({})'.format(len(newdata)))                              
         try: doevents()
-        finally: self._log_('Finished watching', 1); print('Finished watching')
+        except: pass
         
+    def start(self):
+        if not self.__is_watching:
+            self.__is_watching = True
+            self._thread = Thread(ThreadStart(self.main))
+            self._log_('Start watching every {} sec'.format(self.wait/1000))
+            self._log_('Watch directory: {}'.format(self.dir))
+            self._log_('Watch for: {}'.format(self.watchfile))
+            self._log_('Output file: {}'.format(self.outfile), 1)
+            self._log_('Searching for new watch file...')
+            self._thread.Start()
+        else:
+            self._log_('Thread is already running!')
+        
+    def stop(self):
+        if not self.__is_watching: self._log_('Cannot execute stop command: watcher is inactive!')
+        else: 
+            self._log_('Finished watching', 1)
+            self.__is_watching = False
+    
     @staticmethod
-    def reglob(dir, srch):
+    def re_glob(dir, srch):
         file_list = []
         for i in os.walk(dir):
             c_dir = i[0]
@@ -1586,13 +1722,7 @@ class NoActiveProjectFound(Exception):
         pass
     def __str__(self):
         return 'Cannot execute method: No active project found!'
-        
-class FileSearchParameterNotDefined(Exception):
-    def __init__(self):
-        pass
-    def __str__(self):
-        return 'Cannot execute method: No file search parameter defined!'
-        
+               
 class MissingCSVParameter(Exception):
     def __init__(self):
         pass

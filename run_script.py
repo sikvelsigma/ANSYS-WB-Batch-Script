@@ -34,7 +34,6 @@ if modules_files[0]: exec('from {} import WBInterface'.format(modules_files[0]))
 if modules_files[1]: exec('from {} import ExcelFileReader'.format(modules_files[1]))
 if modules_files[2]: exec('from {} import Logger'.format(modules_files[2]))
 if modules_files[3]: exec('import {} as CSVTable'.format(modules_files[3]))
-
 #===========================================================================
 
 if __name__ == '__main__':
@@ -48,25 +47,14 @@ if __name__ == '__main__':
     wb = WBInterface()
 
     try:
-        wb.open_archive()
-    except:
-        try:
-            wb.open_project()
-        except:
-            wb.log('Nothing to open!')
-            raise
-
-    try:
-        wb.read_control()
-        wb.read_input()
-        wb.set_parameters()
+        wb.open_any(archive_first=True)
+        wb.find_and_import_parameters()
         
         """ Set number of cores to 6 or max available using system SYS
         Replace 'SYS' with any other mechanical system.
         This works only with new ribbon interface, which means ANSYS 2019R2 or higher!
         """
-        # wb.set_cores_number('SYS', 6)   
-        
+        # wb.set_cores_number('SYS', 6)          
         
         """Turn on DMP solver using system SYS
         Replace 'SYS' with any other mechanical system
@@ -75,7 +63,6 @@ if __name__ == '__main__':
         # wb.set_distributed('SYS', True) 
         
         wb.update_project()
-        wb.runtime()
         
         """ Try to open SYS and save all Figures (NOT PLOTS!) from a project tree.
         This includes all connected projects which share 'Model' since they are displayed 
@@ -86,11 +73,10 @@ if __name__ == '__main__':
         
         wb.output_parameters()
     except Exception as err_msg:
-        wb.log('CRITICAL ERROR')
-        wb.log(err_msg)
-    else:
-        wb.log('RUN SUCCESSFUL')
+        wb.fatal_error(err_msg)
+    finally:
+        wb.status()
+        wb.issue_end()
     
-    wb.log('END SCRIPT')
-    wb.runtime()
+
 
