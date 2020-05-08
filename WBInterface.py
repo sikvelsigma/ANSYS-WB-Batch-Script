@@ -49,7 +49,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.3'
+__version__ = '3.0.4'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -1749,7 +1749,7 @@ class AsyncLogChecker(object):
         logger: Logger class
         divider: bool; print divider between files
     """
-    __version__ = '0.0.5'
+    __version__ = '0.0.6'
     
     # ---------------------------------------------------------------		
     # Magic methods
@@ -1822,7 +1822,6 @@ class AsyncLogChecker(object):
     
         def do_events():
             """Main event loop"""
-            file_cnt = 0
             while self.__is_watching: 
                 Thread.Sleep(self.wait)
                 if not os.path.exists(self.__current_file): self.__current_file = ''
@@ -1831,7 +1830,7 @@ class AsyncLogChecker(object):
                         self._logger.blank()
                         self._log_('Searching for new watch file...')
                         if self._div_symbol:
-                            args = dict(num=file_cnt, symbol=self._div_symbol, s_len=self._div_length)
+                            args = dict(num=self.__file_cnt, symbol=self._div_symbol, s_len=self._div_length)
                             with open(self.outfile, 'a') as g: g.write(msg_end(**args))
                             
                     self.__current_position = 0
@@ -1842,7 +1841,7 @@ class AsyncLogChecker(object):
                     
                     self.__current_file = file
                     self._log_('Found: {}'.format(self.__current_file))  
-                    file_cnt += 1
+                    self.__file_cnt += 1
                     
                 with open(self.__current_file, 'r') as f, open(self.outfile, 'a') as g:
                     f.seek(self.__current_position)
@@ -1852,8 +1851,12 @@ class AsyncLogChecker(object):
                         g.write(newdata)
                         self._log_('New update ({})'.format(len(newdata))) 
                         if self._console: print(newdata, end='')
-        try: do_events()
-        except: pass
+
+        
+        self.__file_cnt = 0
+        while self.__is_watching:
+            try: do_events()
+            except: pass
         
 
     
