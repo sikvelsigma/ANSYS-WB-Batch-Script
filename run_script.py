@@ -42,6 +42,7 @@ if __name__ == '__main__':
     os.chdir(filedir)
     print('CWD: ' + os.getcwd())
     print('File: ' + filepath)
+    cwdp = lambda x: os.path.join(filedir, x)
     #__________________________________________________________
     
     wb = WBInterface()
@@ -50,11 +51,11 @@ if __name__ == '__main__':
         wb.open_any(archive_first=True)
         wb.find_and_import_parameters()
         
-        """ Set number of cores to 6 or max available using system SYS
+        """ Set number of cores to max available on this machine using system SYS
         Replace 'SYS' with any other mechanical system.
         This works only with new ribbon interface, which means ANSYS 2019R2 or higher!
         """
-        # wb.set_cores_number('SYS', 6)          
+        # wb.set_cores_number('SYS')          
         
         """Turn on DMP solver using system SYS
         Replace 'SYS' with any other mechanical system
