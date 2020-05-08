@@ -76,7 +76,6 @@ if __name__ == '__main__':
     except Exception as err_msg:
         wb.fatal_error(err_msg)
     finally:
-        wb.status()
         wb.issue_end()
     
 

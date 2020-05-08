@@ -49,14 +49,14 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.2'
+__version__ = '3.0.3'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
     """
-    __version__ = '3.0.2'
+    __version__ = '3.0.3'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -158,7 +158,7 @@ class WBInterface(object):
     
     def __init__(self, logger = None, out_file='output.txt', full_report_file='full_report.txt', 
                  control_file_template='*_control.csv', input_file_template='*_input.csv', csv_delim=',', 
-                 csv_skip='no', loginfo=None, apdl_log='APDL_output.txt', async_timer=None):
+                 csv_skip='no', loginfo=None, wb_log='workbench_log.txt', async_timer=None):
         """
         Constructor. All arguments have default values.
         
@@ -217,17 +217,26 @@ class WBInterface(object):
         self.__control_srch_default = '*.control'	#: default key string to search for cotrol file
         self.__input_srch_default = '*.input'		#: default key string to search for input file
         
-        self.__apdl_log = apdl_log
+        self.__workbench_log = wb_log
         
         searcher = ManagementObjectSearcher("Select * from Win32_Processor").Get()
         for i in searcher:
             self.__machine_core_count = int(i["NumberOfCores"])
         
-        dir = os.path.join(os.getcwd(),'_ProjectScratch')
+        # Search for logs in this directories
+        dir = [
+            os.path.join(os.getcwd(),'_ProjectScratch')
+        ]
+        
+        # Search for this log files
+        logs = [
+            'solve.out'
+        ]
+        
         if async_timer:
-            args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', timer=async_timer, logger=self._logger)
+            args = dict(outfile=self.__workbench_log, watch_dir=dir, watchfile=logs, timer=async_timer, logger=self._logger)
         else:
-            args = dict(outfile=self.__apdl_log, watch_dir=dir, watchfile='solve.out', logger=self._logger)
+            args = dict(outfile=self.__workbench_log, watch_dir=dir, watchfile=logs, logger=self._logger)
 
         self.__async_log = AsyncLogChecker(**args)
         self.start_logwatch = self.__async_log.start
@@ -577,16 +586,39 @@ class WBInterface(object):
             self._logger.blank()
         return True
     # --------------------------------------------------------------------    
-    def status(self):
-        """Writes project status to log file"""
-        msg = 'Solution Status: '
+    
+    def success_status(self, suppress=False):
+        """Prints if project run considered as successful"""
+        msg_dict = {
+            0 : 'OVERALL RUN STATUS: SUCCESS',
+            1 : 'OVERALL RUN STATUS: FAILED'       
+        }
+     
+        key = 0 if self.status() < 2 else 1
+             
+        if not suppress: self._log_(msg_dict[key])
+        return key
+        
+    def status(self, suppress=False):
+        """Prints project status to log file"""
+        msg = 'SOLUTION STATUS: '
+        msg_dict = {
+            0 : msg + 'SOLVE SUCCESSFUL',
+            1 : msg + 'NOT UP-TO-DATE',
+            2 : msg + 'FAILED TO UPDATE!',
+            3 : msg + 'NOT SOLVED',
+            4 : msg + 'FAILED TO OPEN',
+            5 : msg + 'NOT OPENED', 
+        }
         if self.__active:
-            if self.__failed_to_update: self._log_(msg + 'FAILED TO UPDATE!')
-            elif self.__not_up_to_date: self._log_(msg + 'NOT UP-TO-DATE')
-            elif self.__solved: self._log_(msg + 'SOLVE SUCCESSFUL')
-            else: self._log_(msg + 'NOT SOLVED')
-        elif self.__failed_to_open: self._log_(msg + 'FAILED TO OPEN')
-        else: self._log_(msg + 'NOT OPENED')
+            if self.__failed_to_update: key = 2
+            elif self.__not_up_to_date: key = 1
+            elif self.__solved: key = 0
+            else: key = 3
+        elif self.__failed_to_open: key = 4
+        else: key = 5     
+        if not suppress: self._log_(msg_dict[key])
+        return key
         
     def fatal_error(self, msg):
         """Method to write a fatal error to log"""
@@ -595,6 +627,7 @@ class WBInterface(object):
         
     def issue_end(self):
         """Call this at the end of your script"""
+        self.success_status()
         self._log_('END RUN')
         self.runtime()
     # -------------------------------------------------------------------- 
@@ -1716,7 +1749,7 @@ class AsyncLogChecker(object):
         logger: Logger class
         divider: bool; print divider between files
     """
-    __version__ = '0.0.4'
+    __version__ = '0.0.5'
     
     # ---------------------------------------------------------------		
     # Magic methods
@@ -1725,7 +1758,7 @@ class AsyncLogChecker(object):
     def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None,
                  div_symbol='=', div_length=60, console=True):            
                     
-        self._logger = logger if logger is not None else Logger('logchecker.txt')
+        self._logger = logger if logger is not None else Logger('log.txt')
         log_prefix = '{}||'.format(str(self.__class__.__name__))
 
         self._log_ = partial(self._logger.log, info=log_prefix) 
@@ -1735,7 +1768,7 @@ class AsyncLogChecker(object):
         self.wait = timer*1000       
         self.watchfile = watchfile
 
-        self._thread = None     
+        self.__thread = None     
         self._log_('Class version: ' + self.__version__ , 1)
         self._div_symbol = div_symbol
         self._div_length = div_length
@@ -1763,13 +1796,13 @@ class AsyncLogChecker(object):
         """Start watching file for updates"""
         if not self.__is_watching:
             self.__is_watching = True
-            self._thread = Thread(ThreadStart(self.__main))
+            self.__thread = Thread(ThreadStart(self.__main))
             self._log_('Start watching every {} sec'.format(self.wait/1000))
-            self._log_('Watch directory: {}'.format(self.dir))
+            self._log_('Watch directories: {}'.format(self.dir))
             self._log_('Watch for: {}'.format(self.watchfile))
             self._log_('Output file: {}'.format(self.outfile), 1)
             self._log_('Searching for new watch file...')
-            self._thread.Start()
+            self.__thread.Start()
         else:
             self._log_('Thread is already running!')
             
@@ -1787,7 +1820,7 @@ class AsyncLogChecker(object):
 
             return '\n\n' + msg_div + msg_brace + msg_main + msg_brace + '\n' + msg_div + '\n'
     
-        def doevents():
+        def do_events():
             """Main event loop"""
             file_cnt = 0
             while self.__is_watching: 
@@ -1819,21 +1852,26 @@ class AsyncLogChecker(object):
                         g.write(newdata)
                         self._log_('New update ({})'.format(len(newdata))) 
                         if self._console: print(newdata, end='')
-        try: doevents()
+        try: do_events()
         except: pass
         
 
     
     @staticmethod
     def re_glob(dir, srch):
+        """Searches for a files in directories"""
         file_list = []
-        for i in os.walk(dir):
-            c_dir = i[0]
-            c_template = os.path.join(c_dir, srch)
-            s = [f for f in glob(c_template)]
-            try: s = s[0]
-            except: continue
-            if s: file_list.append(s)
+        if not isinstance(srch, list): srch = [srch]
+        if not isinstance(dir, list): dir = [dir]
+        for d in dir:
+            for walk in os.walk(d):
+                c_dir = walk[0]
+                for file in srch:
+                    c_template = os.path.join(c_dir, file)
+                    s = [f for f in glob(c_template)]
+                    try: s = s[0]
+                    except: continue
+                    if s: file_list.append(s)
         return file_list
             
 #__________________________________________________________
