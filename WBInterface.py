@@ -3,7 +3,6 @@
 Note: Workbench uses IronPython (Python 2.7)!
 """
 #__________________________________________________________
-#__________________________________________________________
 from __future__ import print_function
 import os
 import shutil
@@ -19,11 +18,13 @@ from csv import QUOTE_MINIMAL
 from datetime import datetime
 from datetime import timedelta
 
-from System.Threading import Thread, ThreadStart
+try:
+    from System.Threading import Thread, ThreadStart
 
-import clr
-clr.AddReference("System.Management")
-from System.Management import ManagementObjectSearcher
+    import clr
+    clr.AddReference("System.Management")
+    from System.Management import ManagementObjectSearcher
+except: pass
 
 # Import global from main to access Workbench commands
 import __main__ as workbench
@@ -49,14 +50,29 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.4'
+__version__ = '3.0.5'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
     and start calculations.
+    
+    Arg:
+        logger (object with logger.log(str) method): Used for creating log file. Autocreates one if not defined.
+        out_file (str): Output file name; defaults to 'output.txt'.
+        full_report_file (str): Workbench parametric report file; defaults to 'full_report.txt'.
+        control_file_template (str): String template for search of control file; defaults to '*_control.csv'.
+        input_file_template (str): String template for search of input file; defaults to '*_input.csv'.
+        csv_delim (str): Delimiter used in csv file; defaults to ','.
+        csv_skip (str): Read as 'no parameters' if found; defaults to 'no'.
+        loginfo (str): Prefix for logger to use; defaults to WBInterface
+        wb_log: str; file for collecting solver logs, defaults to logger file
+        async_timer: float; how often to check for solver logs, default to 0.5 sec
+        
+        Use method log() to write into a log file (see Logger class)
+        Use method blank() to write a blank line
     """
-    __version__ = '3.0.3'
+    __version__ = '3.0.4'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -67,75 +83,76 @@ class WBInterface(object):
     
     @property
     def DPs(self):
-        """Design Points list."""
+        """Design Points list"""
         return self.__DPs
     
     @property
     def DPs_count(self):
-        """Design Points count (imported, present)."""
+        """Design Points count (imported, present)"""
         return (self.__DPs_imported, self.__DPs_present)
     
     @property
     def filename(self):
-        """Opened project."""
+        """Opened project"""
         return self.__workfile	
         
     @property
     def out_file(self):
-        """Output file for parameters."""
+        """Output file for parameters"""
         return self._out_file
     @out_file.setter
     def out_file(self, filename):
-        """Supports manual change of output file."""
+        """Supports manual change of output file"""
         self._out_file = filename
         
     @property
     def full_file(self):
-        """Workbench project summary file."""
+        """Workbench project summary file"""
         return self._full_file
     @full_file.setter
     def full_file(self, filename):
-        """Supports manual change of summary file."""
+        """Supports manual change of summary file"""
         self._full_file = filename
     
     @property
     def logfile(self):
-        """Log file of script execution."""
+        """Log file of script execution"""
         return self._logger.filename
         
     @property
-    def isopen(self):
-        """Returns if there is an opened Workbench project."""
+    def active(self):
+        """Returns if there is an opened Workbench project"""
         return self.__active
         
     @property
     def parameters(self):
-        """Returns IO parameters as dictionaries."""
+        """Returns IO parameters as dictionaries"""
         return (self._param_in_value, 	self._param_out_value)
         
     @property
     def failed_to_update(self):
-        """Returns if project failed to update"""
+        """Returns if project failed to update as bool"""
         return self.__failed_to_update
     
     @property
     def solved(self):
-        """Returns if project is solved"""
+        """Returns if project is solved as bool"""
         return self.__solved
         
     @property
     def failed_to_open(self):
-        """Returns if project failed to open"""
+        """Returns if project failed to open as bool"""
         return self.__failed_to_open
         
     @property
     def not_up_to_date(self):
-        """Returns if project is not up-to-date"""
+        """Returns if project is not up-to-date as bool"""
+        self.__not_up_to_date = not workbench.IsProjectUpToDate()
         return self.__not_up_to_date
         
     @property
     def ansys_version(self):
-        """Returns ANSYS version"""      
+        """Returns ANSYS version string"""      
         if 193 <= self.__ansys_version < 194:
             return '2019R1'
         elif 194 <= self.__ansys_version < 195:
@@ -150,7 +167,7 @@ class WBInterface(object):
     
     @property
     def _ansys_version(self):
-        """Returns ANSYS version number"""
+        """Returns ANSYS version float number """
         return self.__ansys_version
     # ---------------------------------------------------------------		
     # Magic methods
@@ -158,31 +175,19 @@ class WBInterface(object):
     
     def __init__(self, logger = None, out_file='output.txt', full_report_file='full_report.txt', 
                  control_file_template='*_control.csv', input_file_template='*_input.csv', csv_delim=',', 
-                 csv_skip='no', loginfo=None, wb_log='workbench_log.txt', async_timer=None):
-        """
-        Constructor. All arguments have default values.
-        
-        Arg:
-            logger (object with logger.log(str) method): Used for creating log file. Autocreates one if not defined.
-            out_file (str): Output file name; defaults to 'output.txt'.
-            full_report_file (str): Workbench parametric report file; defaults to 'full_report.txt'.
-            control_file_template (str): String template for search of control file; defaults to '*_control.csv'.
-            input_file_template (str): String template for search of input file; defaults to '*_input.csv'.
-            csv_delim (str): Delimiter used in csv file; defaults to ','.
-            csv_skip (str): Read as 'no parameters' if found; defaults to 'no'.
-            loginfo (str): Prefix for logger to use; defaults to WBInterface
-        
-        Use method log() to write into a log file (see Logger class)
+                 csv_skip='no', loginfo=None, wb_log='', async_timer=None):
+        """       
+        Constructor, duh. Check class docstr for info
         """
         self._logger = logger if logger is not None else Logger('log.txt')
         
-        log_prefix = '{}||'.format(str(self.__class__.__name__)) if loginfo is None else loginfo
+        log_prefix = str(self.__class__.__name__) if loginfo is None else loginfo
         
         # Partial logger method with prefix at the start of every line
         try: self._log_ = partial(self._logger.log, info=log_prefix)
         except: self._log_ = self._logger.log
         
-        self._log_('Class version: ' + self.__version__ , 1)
+        self._log_('Class version: ' + self.__version__ )
         
         self.log = self._logger.log					#: original logger method
         self.blank = self._logger.blank
@@ -210,19 +215,21 @@ class WBInterface(object):
         self.__failed_to_open = False
         self.__not_up_to_date = False
         
-        ver = workbench.GetFrameworkBuildVersion().split('.')
+        try: ver = workbench.GetFrameworkBuildVersion().split('.')
+        except: ver = '0'
+        
         self.__ansys_version = float(''.join(ver[0:2]) + '.' + ''.join(ver[2:]))
         self._log_('ANSYS Workbench: %s' % self.ansys_version, 1)
         
         self.__control_srch_default = '*.control'	#: default key string to search for cotrol file
         self.__input_srch_default = '*.input'		#: default key string to search for input file
         
-        self.__workbench_log = wb_log
+        self.__workbench_log = wb_log if wb_log else self._logger.filename
         
-        searcher = ManagementObjectSearcher("Select * from Win32_Processor").Get()
-        for i in searcher:
-            self.__machine_core_count = int(i["NumberOfCores"])
-        
+        try: 
+            searcher = ManagementObjectSearcher("Select * from Win32_Processor").Get()
+            for i in searcher: self.__machine_core_count = int(i["NumberOfCores"])
+        except: self.__machine_core_count = 0
         # Search for logs in this directories
         dir = [
             os.path.join(os.getcwd(),'_ProjectScratch')
@@ -234,9 +241,9 @@ class WBInterface(object):
         ]
         
         if async_timer:
-            args = dict(outfile=self.__workbench_log, watch_dir=dir, watchfile=logs, timer=async_timer, logger=self._logger)
+            args = dict(outfile=wb_log, watch_dir=dir, watchfile=logs, timer=async_timer, logger=self._logger)
         else:
-            args = dict(outfile=self.__workbench_log, watch_dir=dir, watchfile=logs, logger=self._logger)
+            args = dict(outfile=wb_log, watch_dir=dir, watchfile=logs, logger=self._logger)
 
         self.__async_log = AsyncLogChecker(**args)
         self.start_logwatch = self.__async_log.start
@@ -269,6 +276,11 @@ class WBInterface(object):
             #type 'no' to skip outputs
             p1,p4,p5
         Note that lines with '#' will be skipped.
+        
+        Arg:
+            control_file_template: str; search file wioth this pattern, defaults to an init value
+            csv_delim: str; csv delimiterl, defaults to an init value
+            csv_skip: str; tells if no parameters a defined, defaults to an init value
         """
         
         if control_file_template is None: control_file_template=self._control_srch
@@ -279,9 +291,6 @@ class WBInterface(object):
             self._log_('Missing csv delimiter or skipper!', 1)
             raise MissingCSVParameter
             
-        # if control_file_template is None:
-            # self._log_('No control file defined!', 1)
-            # raise FileSearchParameterNotDefined	
         
         for defiter in range(2):
             control_used = control_file_template if not defiter else self.__control_srch_default
@@ -325,6 +334,10 @@ class WBInterface(object):
             30,400
             50,600
         Note that lines with '#' will be skipped.
+        
+        Arg:
+            input_file_template: str; search file wioth this pattern, defaults to an init value
+            csv_delim: str; csv delimiterl, defaults to an init value
         """
         
         if input_file_template is None: input_file_template=self._input_srch
@@ -375,6 +388,10 @@ class WBInterface(object):
     def find_and_import_parameters(self, control_file=None, input_file=None):
         """
         Automatically find and set parameters in Workbench
+        
+        Arg:
+            control_file: str; search file wioth this pattern, defaults to an init value
+            input_file: str; search file wioth this pattern, defaults to an init value
         """
         self.read_control(control_file_template=control_file)
         self.read_input(input_file_template=input_file)
@@ -387,6 +404,9 @@ class WBInterface(object):
         Example of format for 2 parameters and 3 Design Points:
             list = [[1, 2, 3], [10, 20, 30]]
             dict = {'p1':[1, 2, 3], 'p2':[10, 20, 30]}
+            
+        Arg:
+            inp: list or dict
         """
         self._log_('Direct data input by name issued')
         
@@ -409,7 +429,10 @@ class WBInterface(object):
         Example of format for 2 parameters and 3 Design Points:
             inp = [[1, 10], [2, 20], [3, 30]]
             keys = ['p1', 'p2']
-        If no keys provided use already existing keys
+
+        Arg:
+            inp: list, values for parameters
+            keys: list, parameter names, defaults to already existing keys
         """
         self._log_('Direct data input by DPs issued')
         if not self.is_matrix(inp):
@@ -434,7 +457,12 @@ class WBInterface(object):
         self._log_('Input successful: {} input(s) in {} Design Point(s)'.format(len(self._param_in),self.__DPs_imported), 1)		
     # --------------------------------------------------------------------     
     def open_archive(self, archive='*.wbpz'):
-        """Search for Workbench archive in working directory and open it."""
+        """
+        Search for Workbench archive in working directory and open it
+        
+        Arg:
+            archive: str, search for this pattern
+        """
         self._log_('Searching for Workbench archive...')
         try:
             file_list = [f for f in glob(archive)]
@@ -467,7 +495,13 @@ class WBInterface(object):
         return True
     # --------------------------------------------------------------------             
     def open_project(self, project='*.wbpj', refresh=False):		
-        """Search for Workbench project in working directory and open it."""
+        """
+        Search for Workbench project in working directory and open it
+        
+        Arg:
+            project: str, search for this pattern
+            refresh: bool, refresh project after opening
+        """
         self._log_('Searching for Workbench project...')
         try:
             file_list = [f for f in glob(project)]
@@ -499,6 +533,14 @@ class WBInterface(object):
         return True
     # --------------------------------------------------------------------
     def open_any(self, archive_first=True, arch='*.wbpz', prj='*.wbpj'):
+        """
+        Tries to open any project or archive
+        
+        Arg:
+            archive_first: bool, try to open archive first
+            arch: str, search for archive with this pattern
+            prj: str, search for project with this pattern
+        """
         if archive_first: 
             open_1 = partial(self.open_archive, archive=arch)
             open_2 = partial(self.open_project, project=prj)
@@ -511,7 +553,13 @@ class WBInterface(object):
 
     # -------------------------------------------------------------------- 
     def import_parameters(self, save=True):
-        """Use this method instead of set_parameters()"""
+        """
+        Set imported parameters into Workbench
+        Use this method instead of set_parameters()
+        
+        Args:
+            save: bool, save after importing parameters
+        """
         self.set_parameters(saveproject=save)
     
     def set_parameters(self, saveproject=True):
@@ -541,7 +589,14 @@ class WBInterface(object):
         if saveproject: self._save_project()
     # --------------------------------------------------------------------     
     def update_project(self, skip_error=True, skip_uncomplete=True, save=True):
-        """Update Workbench project."""
+        """
+        Update Workbench project
+        
+        Arg:
+            skip_error: bool, skip errors and continue updating
+            skip_uncomplete: bool, skip uncomplete Design Points and continue
+            save: bool, save project after updating
+        """
         if not self.__active:
             self._log_('Cannot update project: No active project found!', 1)
             raise NoActiveProjectFound
@@ -587,54 +642,13 @@ class WBInterface(object):
         return True
     # --------------------------------------------------------------------    
     
-    def success_status(self, suppress=False):
-        """Prints if project run considered as successful"""
-        msg_dict = {
-            0 : 'OVERALL RUN STATUS: SUCCESS',
-            1 : 'OVERALL RUN STATUS: FAILED'       
-        }
-     
-        key = 0 if self.status() < 2 else 1
-             
-        if not suppress: self._log_(msg_dict[key])
-        return key
-        
-    def status(self, suppress=False):
-        """Prints project status to log file"""
-        msg = 'SOLUTION STATUS: '
-        msg_dict = {
-            0 : msg + 'SOLVE SUCCESSFUL',
-            1 : msg + 'NOT UP-TO-DATE',
-            2 : msg + 'FAILED TO UPDATE!',
-            3 : msg + 'NOT SOLVED',
-            4 : msg + 'FAILED TO OPEN',
-            5 : msg + 'NOT OPENED', 
-        }
-        if self.__active:
-            if self.__failed_to_update: key = 2
-            elif self.__not_up_to_date: key = 1
-            elif self.__solved: key = 0
-            else: key = 3
-        elif self.__failed_to_open: key = 4
-        else: key = 5     
-        if not suppress: self._log_(msg_dict[key])
-        return key
-        
-    def fatal_error(self, msg):
-        """Method to write a fatal error to log"""
-        self._log_('FATAL ERROR')
-        self._log_(msg)
-        
-    def issue_end(self):
-        """Call this at the end of your script"""
-        self.success_status()
-        self._log_('END RUN')
-        self.runtime()
-    # -------------------------------------------------------------------- 
     def set_output(self, out_par=None):
         """
         Set list of output parameters by list
         Example: ['p1', 'p3', 'p4']
+        
+        Args:
+            out_par: list, output parameters
         """
         self._log_('Setting output parameters...')
         if not out_par:
@@ -651,6 +665,7 @@ class WBInterface(object):
         self._log_('Success: {} outputs specified'.format(len(self._param_out)), 1)
     # -------------------------------------------------------------------- 
     def save_project(self):
+        """Save Workbench project"""
         if not self.__active:
             self._log_('Cannot save project: No active project found!', 1)
             raise NoActiveProjectFound 
@@ -662,6 +677,11 @@ class WBInterface(object):
         Output parameters in a file. Set output_file_name = '' to suppress
         output to a file.
         
+        Args:
+            output_file_name: str, write to this file, if empty - output internally only
+            full_report_file: str, Workbench parametric report file
+            csv_delim: str, csv delimiter
+            fkey: str, file opening mode 
         """
         if not self.__active:
             self._log_('Cannot output parameters: No active project found!', 1)
@@ -669,58 +689,59 @@ class WBInterface(object):
             
         if output_file_name is None: output_file_name=self._out_file
         if full_report_file is None: full_report_file=self._full_file
-        if csv_delim is None: csv_delim=self._csv_delim
+        if csv_delim is None: csv_delim=self._csv_delim             
         
-        if csv_delim is None:
-            self._log_('Missing csv delimiter or skipper!', 1)
-            raise MissingCSVParameter
+        if self._param_out:
+                      
+            if csv_delim is None:
+                self._log_('Missing csv delimiter or skipper!', 1)
+                raise MissingCSVParameter
+            
+            self._param_out_value = defaultdict(list)
+            self._log_('Retrieving output parameters... ')
         
-        if not self._param_out:
+            try:
+                for key in self._param_out:
+                    for dp in self.__DPs:
+                        val = self._get_parameter_value(dp, key)
+                        self._param_out_value[key.upper()].append(val)	
+            except Exception as err_msg:
+                self._log_('Failed to retriev parameters!')
+                self._log_(err_msg, 1)
+                return
+                
+            if output_file_name is None or output_file_name == '':
+                self._log_('No output file defined! Results were stored internally', 1)
+                return
+                
+            self._log_('Outputing parameters to ' + output_file_name + '...')
+
+            try:
+                # Group values by Design Point 
+                out_map = self._output_group_by_DPs()
+                
+                with open(output_file_name, mode=fkey) as out_file:
+                    out_writer = csvwriter(out_file, delimiter=csv_delim, quotechar='"', quoting=QUOTE_MINIMAL)			
+                    for row in out_map:
+                        out_writer.writerow(row)
+                        
+            except Exception as err_msg:
+                self._log_('An error occured while outputting parameters!')
+                self._log_(err_msg, 1)  
+            else:
+                self._log_('Output successful', 1)
+        else:
             self._log_('No parameters to output!', 1)
             return
             
-            
-        self._param_out_value = defaultdict(list)
-        self._log_('Retrieving output parameters... ')
-    
-        try:
-            for key in self._param_out:
-                for dp in self.__DPs:
-                    val = self._get_parameter_value(dp, key)
-                    self._param_out_value[key.upper()].append(val)	
-        except Exception as err_msg:
-            self._log_('Failed to retriev parameters!')
-            self._log_(err_msg, 1)
-            return
-            
-        if output_file_name is None or output_file_name == '':
-            self._log_('No output file defined! Results were stored internally', 1)
-            return
-            
-        self._log_('Outputing parameters to ' + output_file_name + '...')
-
-        try:
-            # Group values by Design Point 
-            out_map = self._output_group_by_DPs()
-            
-            with open(output_file_name, mode=fkey) as out_file:
-                out_writer = csvwriter(out_file, delimiter=csv_delim, quotechar='"', quoting=QUOTE_MINIMAL)			
-                for row in out_map:
-                    out_writer.writerow(row)
-                    
-        except Exception as err_msg:
-            self._log_('An error occured while outputting parameters!')
-            self._log_(err_msg, 1)  
-        else:
-            self._log_('Output successful', 1)
-        finally:
+        if full_report_file:
             try:
                 workbench.Parameters.ExportAllDesignPointsData(FileName=full_report_file)
                 self._log_('Workbench parametric report written to {}'.format(full_report_file), 1)
             except:
                 self._log_('Cannot generate Workbench report!', 1)
-                
-            self._save_project()
+                    
+                self._save_project()
     
     def copy_from_userfiles(self, template_str, target):
         self.copy_files(template_str, workbench.GetUserFilesDirectory() , target)
@@ -728,6 +749,73 @@ class WBInterface(object):
     def move_from_userfiles(self, template_str, target):
         self.move_files(template_str, workbench.GetUserFilesDirectory() , target)
         
+    # ---------------------------------------------------------------
+    # Messenger Methods 
+    # ---------------------------------------------------------------     
+    def success_status(self, suppress=False):
+        """
+        Prints if project run considered as successful
+        
+        Args:
+            suppress: bool; suppress output to log file
+        """
+        msg_dict = {
+            0 : 'OVERALL RUN STATUS: SUCCESS',
+            1 : 'OVERALL RUN STATUS: FAILED'       
+        }
+     
+        key = 0 if self.status() < 2 else 1
+             
+        if not suppress: self._log_(msg_dict[key])
+        return key
+        
+    def status(self, suppress=False):
+        """
+        Prints project status to log filem returns a status key
+        
+        Args:
+            suppress: bool; suppress output to log file
+        """
+        msg = 'SOLUTION STATUS: '
+        msg_dict = {
+            0 : msg + 'SOLVE SUCCESSFUL',
+            1 : msg + 'NOT UP-TO-DATE',
+            2 : msg + 'FAILED TO UPDATE!',
+            3 : msg + 'NOT SOLVED',
+            4 : msg + 'FAILED TO OPEN',
+            5 : msg + 'NOT OPENED', 
+        }
+        if self.active:
+            if self.failed_to_update: key = 2
+            elif self.not_up_to_date: key = 1
+            elif self.solved: key = 0
+            else: key = 3
+        elif self.failed_to_open: key = 4
+        else: key = 5     
+        if not suppress: self._log_(msg_dict[key])
+        return key
+        
+    def fatal_error(self, msg):
+        """
+        Method to write a fatal error to log
+        
+        Args:
+            msg: str; log this message as fatal error
+        """
+        msg_str = 'FATAL ERROR'       
+        msg_send = str(msg).splitlines()
+        
+        for m in msg_send:
+            self._log_('{}: {}'.format(msg_str, m))
+        
+    def issue_end(self):
+        """
+        Call this at the end of your script. Calls success_status() and runtime() 
+        """
+        self.success_status()
+        self._log_('END RUN', 1)
+        self.runtime()       
+    
     # ---------------------------------------------------------------
     # JScript Wrappers
     # --------------------------------------------------------------- 
@@ -750,9 +838,12 @@ class WBInterface(object):
             self._log_('Older ANSYS versions do not support this function!', 1)
             return False
         
-        if not value: 
+        if not value and self.__machine_core_count: 
             value = self.__machine_core_count
             self._log_('Requesting maximum number of cores on this machine')
+        elif not value and not self.__machine_core_count: 
+            self._log_('Could not set core count to maximum: core count undefined') 
+            return False      
         
         if not isinstance(value, int) or value < 0:
             self._log_('Error: Attempted to set incorrect number of cores: {}'.format(value))
@@ -871,6 +962,10 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
             filename: str
+            width: float; width of a picture, defaults to Workbench default
+            height: float; height of a picture, defaults to Workbench default
+            fontfact: float, increases legend size
+            zoom_to_fit: bool, set isoview and zoom to fit for pictures
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
@@ -938,7 +1033,7 @@ class WBInterface(object):
             return False
         else: return True
     # -------------------------------------------------------------------- 
-    def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
+    def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3!
         Saves mesh view.
@@ -947,6 +1042,10 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
             filename: str
+            width: float; width of a picture, defaults to Workbench default
+            height: float; height of a picture, defaults to Workbench default
+            fontfact: float, increases legend size
+            zoom_to_fit: bool, set isoview and zoom to fit for pictures
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
@@ -1014,7 +1113,7 @@ class WBInterface(object):
             return False
         else: return True
        
-    def save_setups_view(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
+    def save_setups_view(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3!
         Saves all environments setups in png.
@@ -1022,6 +1121,10 @@ class WBInterface(object):
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
+            width: float; width of a picture, defaults to Workbench default
+            height: float; height of a picture, defaults to Workbench default
+            fontfact: float, increases legend size
+            zoom_to_fit: bool, set isoview and zoom to fit for pictures
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
@@ -1077,7 +1180,7 @@ class WBInterface(object):
         else: return True
         
     # -------------------------------------------------------------------- 
-    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=False):
+    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
         Tested only on ANSYS2019R3!
         Saves all figures (not plot!) in png. 
@@ -1085,6 +1188,10 @@ class WBInterface(object):
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
+            width: float; width of a picture, defaults to Workbench default
+            height: float; height of a picture, defaults to Workbench default
+            fontfact: float, increases legend size
+            zoom_to_fit: bool, set isoview and zoom to fit for pictures
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
@@ -1149,8 +1256,15 @@ class WBInterface(object):
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
-            unit_sys_id: str; unit system; 
-                'MKS', 'CGS', 'NMM', 'BFT', 'BIN', 'UMKS', 'NMMton', 'NMMdat'          
+            unit_sys_id: str or int; unit system; 
+                'MKS'     : 0
+                'CGS'     : 1
+                'NMM'     : 2
+                'BFT'     : 3
+                'BIN'     : 4
+                'UMKS'    : 9
+                'NMMton'  : 13
+                'NMMdat'  : 14     
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """       
@@ -1159,30 +1273,38 @@ class WBInterface(object):
             self._log_('Older ANSYS versions do not support this function!', 1)
             return False
         
-        if unit_sys == 'MKS': 
+        if unit_sys in ('MKS', 0): 
             unit_sys_id = 0
             unit_msg = 'Metric (m, kg, N, s, V, A)'
-        elif unit_sys == 'CGS': 
+            
+        elif unit_sys in ('CGS', 1): 
             unit_sys_id = 1
             unit_msg = 'Metric (cm, g, dyne, s, V, A)'
-        elif unit_sys == 'NMM': 
+            
+        elif unit_sys in ('NMM', 2): 
             unit_sys_id = 2
             unit_msg = 'Metric (mm, kg, N, s, mV, mA)'
-        elif unit_sys == 'BFT': 
+            
+        elif unit_sys in ('BFT', 3): 
             unit_sys_id = 3
             unit_msg = 'U.S. Customary (ft, lbm, lbf, °F, s, V, A)'
-        elif unit_sys == 'BIN': 
+            
+        elif unit_sys in ('BIN', 4): 
             unit_sys_id = 4
             unit_msg = 'U.S. Customary (in, lbm, lbf, °F, s, V, A)'
-        elif unit_sys == 'UMKS': 
+            
+        elif unit_sys in ('UMKS', 9): 
             unit_sys_id = 9
             unit_msg = 'Metric (um, kg, uN, s, V, mA)'
-        elif unit_sys == 'NMMton': 
+            
+        elif unit_sys in ('NMMton', 13): 
             unit_sys_id = 13
             unit_msg = 'Metric (mm, t, N, s, mV, mA)'
-        elif unit_sys == 'NMMdat': 
+            
+        elif unit_sys in ('NMMdat', 14): 
             unit_sys_id = 14
             unit_msg = 'Metric (mm, dat, N, s, mV, mA)'
+            
         else: 
             self._log_('Cannot set unit system: unknown system ID = {}'.format(unit_sys), 1)
             return False
@@ -1219,7 +1341,12 @@ class WBInterface(object):
             container: str; specify a Mechanical system, e.g. 'SYS'         
             module: str; module to open
             scale: num or str; valid strings are
-                '0.5auto', 'auto', '2auto', '5auto', 'undef', 'actual'
+                    '0.5auto'
+                    'auto'
+                    '2auto'
+                    '5auto'
+                    'undef' or 'undeformed'
+                    'actual' or 'true'
             ignore_js_err: bool; wraps js main cammands in a try block
         """   
         if self.__ansys_version < 194:
@@ -1229,6 +1356,7 @@ class WBInterface(object):
         
         strwrap = lambda x: '"{}"'.format(x)
         undf_st = ('undef','undeformed')
+        act_st = ('actual', 'true')
         
         if isinstance(scale, str):
             arg = strwrap(scale)
@@ -1237,7 +1365,7 @@ class WBInterface(object):
             elif scale == '5auto'    : msg = 'five auto'                
             elif scale in undf_st    : msg = 'undeformed'               
             elif scale == '0.5auto'  : msg = 'half auto'               
-            elif scale == 'actual'   : msg = 'true scale'
+            elif scale in act_st     : msg = 'true scale'
                 
             else:
                 self._log_('Incorrect scale!')
@@ -1287,6 +1415,10 @@ class WBInterface(object):
                                 case "actual"     :
                                     mode = 1;   // Actual
                                     break;
+                                    
+                                case "true"     :
+                                    mode = 1;   // Actual
+                                    break;    
 
                                 case "0.5auto"    :
                                     mode = 2;   // HalfAuto
@@ -1407,6 +1539,9 @@ class WBInterface(object):
     
     @staticmethod
     def __jsfun_savepics():
+        """
+        JS functions used to print pictures
+        """
         return '''
             function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode){                              
                 var numObjs = activeObjs.Count;
@@ -1434,7 +1569,9 @@ class WBInterface(object):
                         
                         if (pFit) {
                             DS.Graphics.setisoview(7);
-                            DS.Script.doGraphicsFit();                           
+                            DS.Script.doGraphicsFit();     
+                            DS.Graphics.RescaleAnnotation();
+                            DS.Graphics.Redraw(1);
                         }
                         
                         if (!pName) {
@@ -1508,7 +1645,15 @@ class WBInterface(object):
         '''
     
     def send_js_macro(self, system, macro, component='Model', gui=False):
-        """Use this to send commands to systems, calls Workbench SendCommand()"""
+        """
+        Use this to send commands to systems, calls Workbench SendCommand()
+        
+        Arg:
+            system: str; specify a Mechanical system, e.g. 'SYS'
+            macro: str; JS macro string
+            component: str; module to open
+            gui: bool, draw GUI as some commands won't work otherwise
+        """
         self._log_('Sending macros to Workbench system')
         self._send_js_macro(system, macro, comp=component, visible=gui)
     # ---------------------------------------------------------------
@@ -1537,7 +1682,7 @@ class WBInterface(object):
             self._log_('Cannot send js macro: No active project found!', 1)
             raise NoActiveProjectFound
         
-        self._log_('Running JScript at -> System: "{}", Component: "{}"'.format(sys, comp))
+        self._log_('Running Script at -> System: "{}", Component: "{}"'.format(sys, comp))
         
         ds_space = 'WB.AppletList.Applet("DSApplet").App.'
         code = code.replace('DS.', ds_space) 
@@ -1658,10 +1803,15 @@ class WBInterface(object):
         return ns_len
         
     @staticmethod
-    def decomment(csvfile):
-        """Remove comments from file."""
+    def decomment(csvfile, symb='#'):
+        """
+        Remove comments from file
+        
+        Args:
+            symb: str, comments symbol
+        """
         for row in csvfile:
-            raw = row.split('#')[0].strip()
+            raw = row.split(symb)[0].strip()
             if raw: yield raw
             
     @staticmethod		
@@ -1679,6 +1829,14 @@ class WBInterface(object):
     
     @staticmethod
     def copy_files(template, source_dir, target_dir):
+        """
+        Copy files
+        
+        Args:
+            template: str, search files with this pattern
+            source_dir: str, source dir
+            target_dir: str, target dir
+        """
         srch_template = os.path.join(source_dir, template)
         try:
             srch = [f for f in glob(srch_template)]
@@ -1693,6 +1851,14 @@ class WBInterface(object):
                 
     @staticmethod            
     def move_files(template, source_dir, target_dir):
+        """
+        Move files
+        
+        Args:
+            template: str, search files with this pattern
+            source_dir: str, source dir
+            target_dir: str, target dir
+        """
         srch_template = os.path.join(source_dir, template)
         try:
             srch = [f for f in glob(srch_template)]
@@ -1707,15 +1873,19 @@ class WBInterface(object):
                 
     @staticmethod
     def _listify(inp):	
-        """Returns list of 1 items if input is not a list"""
+        """Returns list of 1 item if input is not a list"""
         return inp if isinstance(inp, list) else [inp]
     
     @staticmethod
     def _get_parameter(name):
+        """
+        Gets Workbench Parameter object with name 'name'
+        """
         return workbench.Parameters.GetParameter(Name=name)	
     # ---------------------------------------------------------------   
     @staticmethod
     def _try_wrapper_js(code):
+        """Wrap JS macros in this block if ignore_js_err=True"""
         return '''
             try {
                 %s
@@ -1727,12 +1897,13 @@ class WBInterface(object):
     @staticmethod
     def _winpath_js(dirpath):
         """
-        Make all back slashes into double
+        Make all back slashes into double to send into JS
         """
         return os.path.join(dirpath, '').replace('\\', '\\\\')
     # ---------------------------------------------------------------    
     @staticmethod
     def _bool_js(value):
+        """Converts to JS boolean to send in macro"""
         return 'true' if value else 'false'
 
 #__________________________________________________________
@@ -1742,24 +1913,24 @@ class AsyncLogChecker(object):
     Class used for pulling text from files.
     Does not support pulling info from several concurrent files!
     Arg:
-        outfile: str
+        outfile: str; if empty, write to logger files
         watch_dir: str; upper level dir, watch file will be searched in all child dirs
         watchfile: str; search for this file, supports template string
         timer: float; check for updates each <timer> seconds
         logger: Logger class
         divider: bool; print divider between files
     """
-    __version__ = '0.0.6'
+    __version__ = '0.0.7'
     
     # ---------------------------------------------------------------		
     # Magic methods
     # ---------------------------------------------------------------
     
     def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None,
-                 div_symbol='=', div_length=60, console=True):            
+                 div_symbol='@', div_length=35, console=True):            
                     
         self._logger = logger if logger is not None else Logger('log.txt')
-        log_prefix = '{}||'.format(str(self.__class__.__name__))
+        log_prefix = str(self.__class__.__name__)
 
         self._log_ = partial(self._logger.log, info=log_prefix) 
         
@@ -1779,7 +1950,8 @@ class AsyncLogChecker(object):
         self.__is_watching = False 
             
         
-        with open(self.outfile, 'w') as f: pass
+        if self.outfile:
+            with open(self.outfile, 'w') as f: pass
                    
     # ---------------------------------------------------------------		
     # Public methods
@@ -1795,12 +1967,13 @@ class AsyncLogChecker(object):
     def start(self):
         """Start watching file for updates"""
         if not self.__is_watching:
+            actual_outfile = self.outfile if self.outfile else self._logger.filename
             self.__is_watching = True
             self.__thread = Thread(ThreadStart(self.__main))
             self._log_('Start watching every {} sec'.format(self.wait/1000))
             self._log_('Watch directories: {}'.format(self.dir))
             self._log_('Watch for: {}'.format(self.watchfile))
-            self._log_('Output file: {}'.format(self.outfile), 1)
+            self._log_('Output file: {}'.format(actual_outfile), 1)
             self._log_('Searching for new watch file...')
             self.__thread.Start()
         else:
@@ -1808,10 +1981,10 @@ class AsyncLogChecker(object):
             
     # ---------------------------------------------------------------		
     # Private methods
-    # ---------------------------------------------------------------
-    
+    # --------------------------------------------------------------- 
     def __main(self):
         """Main execution function"""
+        # ---------------------------------------------------------------
         def msg_end(num, symbol, s_len):
             """Divider message"""
             msg_main = 'FILE %s END' % num
@@ -1819,7 +1992,7 @@ class AsyncLogChecker(object):
             msg_brace = symbol * s_len 
 
             return '\n\n' + msg_div + msg_brace + msg_main + msg_brace + '\n' + msg_div + '\n'
-    
+        # ---------------------------------------------------------------
         def do_events():
             """Main event loop"""
             while self.__is_watching: 
@@ -1831,7 +2004,9 @@ class AsyncLogChecker(object):
                         self._log_('Searching for new watch file...')
                         if self._div_symbol:
                             args = dict(num=self.__file_cnt, symbol=self._div_symbol, s_len=self._div_length)
-                            with open(self.outfile, 'a') as g: g.write(msg_end(**args))
+                            if self.outfile:
+                                with open(self.outfile, 'a') as g: g.write(msg_end(**args))
+                            else: self._log_(msg_end(**args), 2)
                             
                     self.__current_position = 0
                     
@@ -1843,26 +2018,33 @@ class AsyncLogChecker(object):
                     self._log_('Found: {}'.format(self.__current_file))  
                     self.__file_cnt += 1
                     
-                with open(self.__current_file, 'r') as f, open(self.outfile, 'a') as g:
+                with open(self.__current_file, 'r') as f: 
                     f.seek(self.__current_position)
                     newdata = f.read()
                     self.__current_position = f.tell()
                     if newdata and newdata != '\n': 
-                        g.write(newdata)
-                        self._log_('New update ({})'.format(len(newdata))) 
-                        if self._console: print(newdata, end='')
-
-        
+                        if self.outfile:
+                            with open(self.outfile, 'a') as g: g.write(newdata)
+                            self._log_('New update ({})'.format(len(newdata))) 
+                            if self._console: print(newdata, end='')
+                        else: self._log_(newdata, 2)                        
+        # ---------------------------------------------------------------    
+        # Restart loop on error, this is a part of __main() for anyone confused
         self.__file_cnt = 0
         while self.__is_watching:
             try: do_events()
             except: pass
-        
-
+    # ---------------------------------------------------------------
     
     @staticmethod
     def re_glob(dir, srch):
-        """Searches for a files in directories"""
+        """
+        Searches for a files in directories recursively
+        
+        Arg:
+            dir: str or list, upper-level search directory
+            srch: str of list, search for this patterns
+        """
         file_list = []
         if not isinstance(srch, list): srch = [srch]
         if not isinstance(dir, list): dir = [dir]
