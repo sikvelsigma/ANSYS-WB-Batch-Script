@@ -43,11 +43,11 @@ if __name__ == '__main__':
     print('CWD: ' + os.getcwd())
     print('File: ' + filepath)
     cwdp = lambda x: os.path.join(filedir, x)
-    #__________________________________________________________
-    
-    wb = WBInterface()
+    #__________________________________________________________    
 
     try:
+        wb = WBInterface()
+        
         wb.open_any(archive_first=True)
         wb.find_and_import_parameters()
         
@@ -73,6 +73,7 @@ if __name__ == '__main__':
         # wb.save_figures('SYS', os.path.join(filedir, 'pictures'), width=1920, height=1080, fontfact=1.35)
         
         wb.output_parameters()
+        wb.export_wb_report()
     except Exception as err_msg:
         wb.fatal_error(err_msg)
     finally:

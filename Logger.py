@@ -5,7 +5,7 @@ from __future__ import print_function
 from datetime import datetime
 from datetime import timedelta
 
-__version__ = '1.0.9'
+__version__ = '1.1.0'
 
 class Logger(object):
     """
@@ -18,7 +18,7 @@ class Logger(object):
         info: str; add this strs at the beginning of each message
         console: bool; duplicate output to stdout 
     """
-    __version__ = '1.0.9'
+    __version__ = '1.1.0'
     
     __files_in_use = set()
     
@@ -59,8 +59,8 @@ class Logger(object):
         self.__logger_instance = self.__total_instances
         self.__init_time = datetime.now()
         
-        self._log_('New Logger instance created ({})'.format(self.__total_instances), 1)
-        self._log_('Class version: ' + self.__version__ )
+        self._log_('New Logger instance created ({})'.format(self.__total_instances))
+        self._log_('Class version: ' + self.__version__ ,1)
         
         
     def __repr__(self):

@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.5'
+__version__ = '3.0.6'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.4'
+    __version__ = '3.0.5'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -672,7 +672,7 @@ class WBInterface(object):
         workbench.Save(Overwrite=True)
         self._log_('Project Saved', 1)
     # --------------------------------------------------------------------
-    def output_parameters(self, output_file_name=None, full_report_file=None, csv_delim=None, fkey='wb'):
+    def output_parameters(self, output_file_name=None, csv_delim=None, fkey='wb'):
         """
         Output parameters in a file. Set output_file_name = '' to suppress
         output to a file.
@@ -688,7 +688,6 @@ class WBInterface(object):
             raise NoActiveProjectFound 
             
         if output_file_name is None: output_file_name=self._out_file
-        if full_report_file is None: full_report_file=self._full_file
         if csv_delim is None: csv_delim=self._csv_delim             
         
         if self._param_out:
@@ -705,43 +704,58 @@ class WBInterface(object):
                     for dp in self.__DPs:
                         val = self._get_parameter_value(dp, key)
                         self._param_out_value[key.upper()].append(val)	
+                        
+                # Group values by Design Point         
+                out_map = self._output_group_by_DPs()
             except Exception as err_msg:
                 self._log_('Failed to retriev parameters!')
                 self._log_(err_msg, 1)
-                return
+                return None
                 
+
             if output_file_name is None or output_file_name == '':
                 self._log_('No output file defined! Results were stored internally', 1)
-                return
-                
-            self._log_('Outputing parameters to ' + output_file_name + '...')
+                return out_map
 
-            try:
-                # Group values by Design Point 
-                out_map = self._output_group_by_DPs()
-                
+            self._log_('Outputing parameters to {}...'.format(output_file_name))
+            try:           
                 with open(output_file_name, mode=fkey) as out_file:
                     out_writer = csvwriter(out_file, delimiter=csv_delim, quotechar='"', quoting=QUOTE_MINIMAL)			
-                    for row in out_map:
-                        out_writer.writerow(row)
-                        
+                    for row in out_map: out_writer.writerow(row)                       
             except Exception as err_msg:
                 self._log_('An error occured while outputting parameters!')
                 self._log_(err_msg, 1)  
+                return None
             else:
                 self._log_('Output successful', 1)
+                return out_map
         else:
             self._log_('No parameters to output!', 1)
-            return
-            
+            return None
+              
+    # --------------------------------------------------------------------
+    def export_wb_report(self, full_report_file=None):
+        """
+        Exports Workbench parametric report/
+        
+        Args:
+            full_report_file: str, Workbench parametric report file
+        """
+    
+        if not self.__active:
+            self._log_('Cannot output parameters: No active project found!', 1)
+            raise NoActiveProjectFound
+        
+        if full_report_file is None: full_report_file=self._full_file
         if full_report_file:
             try:
                 workbench.Parameters.ExportAllDesignPointsData(FileName=full_report_file)
                 self._log_('Workbench parametric report written to {}'.format(full_report_file), 1)
             except:
                 self._log_('Cannot generate Workbench report!', 1)
-                    
-                self._save_project()
+        else:
+            self._log_('Cannot export Workbench report: file name is not defined!', 1)
+    
     
     def copy_from_userfiles(self, template_str, target):
         self.copy_files(template_str, workbench.GetUserFilesDirectory() , target)
