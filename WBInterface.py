@@ -50,21 +50,21 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.6'
+__version__ = '3.0.7'
 #__________________________________________________________
 class WBInterface(object):
     """
     A class to open Workbench project/archive, input/output parameters
-    and start calculations.
+    and start calculations
     
     Arg:
-        logger (object with logger.log(str) method): Used for creating log file. Autocreates one if not defined.
-        out_file (str): Output file name; defaults to 'output.txt'.
-        full_report_file (str): Workbench parametric report file; defaults to 'full_report.txt'.
-        control_file_template (str): String template for search of control file; defaults to '*_control.csv'.
-        input_file_template (str): String template for search of input file; defaults to '*_input.csv'.
-        csv_delim (str): Delimiter used in csv file; defaults to ','.
-        csv_skip (str): Read as 'no parameters' if found; defaults to 'no'.
+        logger (object with logger.log(str) method): Used for creating log file. Autocreates one if not defined
+        out_file (str): Output file name; defaults to 'output.txt'
+        full_report_file (str): Workbench parametric report file; defaults to 'full_report.txt'
+        control_file_template (str): String template for search of control file; defaults to '*_control.csv'
+        input_file_template (str): String template for search of input file; defaults to '*_input.csv'
+        csv_delim (str): Delimiter used in csv file; defaults to ','
+        csv_skip (str): Read as 'no parameters' if found; defaults to 'no'
         loginfo (str): Prefix for logger to use; defaults to WBInterface
         wb_log: str; file for collecting solver logs, defaults to logger file
         async_timer: float; how often to check for solver logs, default to 0.5 sec
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.5'
+    __version__ = '3.0.6'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -269,7 +269,7 @@ class WBInterface(object):
     
     def read_control(self, control_file_template=None, csv_delim=None, csv_skip=None):
         """
-        Read csv file with IO parameter list.
+        Read csv file with IO parameter list
         Example of control file format with 2 inputs and 3 outputs:
             #type 'no' to skip inputs
             p3,p2
@@ -327,13 +327,13 @@ class WBInterface(object):
     # --------------------------------------------------------------------   
     def read_input(self, input_file_template=None, csv_delim=None):
         """
-        Read csv file with input parameters.
+        Read csv file with input parameters
         Example of format for 2 parameters and 3 Design Points:
             #p3,p2
             10,200
             30,400
             50,600
-        Note that lines with '#' will be skipped.
+        Note that lines with '#' will be skipped
         
         Arg:
             input_file_template: str; search file wioth this pattern, defaults to an init value
@@ -347,12 +347,6 @@ class WBInterface(object):
             self._log_('Missing csv delimiter or skipper!', 1)
             raise MissingCSVParameter
         
-        # if input_file_template is None:
-            # self._log_('No input file defined!', 1)
-            # raise FileSearchParameterNotDefined
-        # elif self._control_srch is None:
-            # self._log_('No control file defined!', 1)
-            # raise FileSearchParameterNotDefined	
         if not self._param_in:
             self._log_('No parameters to input!', 1)
             return
@@ -425,7 +419,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def input_by_DPs(self, inp, keys=None):
         """
-        Allows directly feed input parameters as list with list of keys.
+        Allows directly feed input parameters as list with list of keys
         Example of format for 2 parameters and 3 Design Points:
             inp = [[1, 10], [2, 20], [3, 30]]
             keys = ['p1', 'p2']
@@ -534,7 +528,7 @@ class WBInterface(object):
     # --------------------------------------------------------------------
     def open_any(self, archive_first=True, arch='*.wbpz', prj='*.wbpj'):
         """
-        Tries to open any project or archive
+        Tries to open any project or archive in the current working directory
         
         Arg:
             archive_first: bool, try to open archive first
@@ -563,7 +557,7 @@ class WBInterface(object):
         self.set_parameters(saveproject=save)
     
     def set_parameters(self, saveproject=True):
-        """Set imported parameters into Workbench."""
+        """Set imported parameters into Workbench"""
         if not self.__active:
             self._log_('Cannot set parameters: No active project found!', 1)
             raise NoActiveProjectFound
@@ -675,7 +669,7 @@ class WBInterface(object):
     def output_parameters(self, output_file_name=None, csv_delim=None, fkey='wb'):
         """
         Output parameters in a file. Set output_file_name = '' to suppress
-        output to a file.
+        output to a file
         
         Args:
             output_file_name: str, write to this file, if empty - output internally only
@@ -734,9 +728,15 @@ class WBInterface(object):
             return None
               
     # --------------------------------------------------------------------
+    def set_active_DP(self, dp):
+        """Sets active DP"""
+        try: workbench.Parameters.SetBaseDesignPoint(DesignPoint=dp)
+        except: pass
+    
+    # --------------------------------------------------------------------
     def export_wb_report(self, full_report_file=None):
         """
-        Exports Workbench parametric report/
+        Exports Workbench parametric report
         
         Args:
             full_report_file: str, Workbench parametric report file
@@ -835,8 +835,7 @@ class WBInterface(object):
     # --------------------------------------------------------------- 
     def set_cores_number(self, container, value=0, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
-        Sets number of cores in Mechanical. 
+        Sets number of cores in Mechanical
         
         Warning: number of cores for Mechanical is a global setting and will be
         saved as default. Next project run on this machine will use this setting!
@@ -911,8 +910,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def set_distributed(self, container, value, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3! ANSYS version with old interface won't work!
-        Activates/deactivates DMP in Mechanical. 
+        Activates/deactivates DMP in Mechanical
         
         Warning: this property is a global setting and will be
         saved as default. Next project run on this machine will use this setting!
@@ -968,9 +966,8 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def save_overview(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Saves model overview.
-        This is a modified ripped function from ANSYS to dump all figures in cwd.
+        Saves model overview
+        This is a modified ripped function from ANSYS to dump all figures in cwd
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
@@ -1049,8 +1046,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Saves mesh view.
+        Saves mesh view
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
@@ -1127,14 +1123,14 @@ class WBInterface(object):
             return False
         else: return True
        
-    def save_setups_view(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_setups_view(self, container, fpath, fpref='Setup', width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Saves all environments setups in png.
+        Saves all environments setups in png
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
+            fpref: str, file name prefix
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
@@ -1150,7 +1146,7 @@ class WBInterface(object):
         if not os.path.exists(fpath): os.makedirs(fpath)
         
         jsfun = self.__jsfun_savepics() + '''
-            function DumpSetups(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
+            function DumpSetups(pdir, pHeight, pWidth, pFontFactor, pFit, pPref) {                                          
                 var clsidEnv = 105; // load cases
                
                 var activeObjs = DS.Tree.AllObjects;
@@ -1174,13 +1170,13 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = true;
-                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", "Setup", pFit, 0);
+                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0);
               
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''                        
-        jsmain = 'DumpSetups("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
+        jsmain = 'DumpSetups("{}", {}, {}, {}, {}, "{}");'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1194,14 +1190,14 @@ class WBInterface(object):
         else: return True
         
     # -------------------------------------------------------------------- 
-    def save_figures(self, container, fpath, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_figures(self, container, fpath, fpref='Result', width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Saves all figures (not plot!) in png. 
+        Saves all figures (not plot!) in png
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
             fpath: str; save directory
+            fpref: str, file name prefix
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
@@ -1219,7 +1215,7 @@ class WBInterface(object):
 
         
         jsfun = self.__jsfun_savepics() + '''
-            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit) {                                          
+            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit, pPref) {                                          
                 var clsidFigure = 147; // figures
                 
                 var activeObjs = DS.Tree.AllObjects;
@@ -1243,13 +1239,13 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = false;
-                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", "Result", pFit, 0);
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0);
                 
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {});'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit))
+        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}");'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1265,8 +1261,7 @@ class WBInterface(object):
     # -------------------------------------------------------------------- 
     def set_unit_system(self, container, unit_sys, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Changes unit system is Mechanical.
+        Changes unit system is Mechanical
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'
@@ -1348,8 +1343,7 @@ class WBInterface(object):
         # -------------------------------------------------------------------- 
     def set_figures_scale(self, container, scale, module='Model', ignore_js_err=True):
         """
-        Tested only on ANSYS2019R3!
-        Sets scale of figures. 
+        Sets scale of figures
         
         Arg:
             container: str; specify a Mechanical system, e.g. 'SYS'         
@@ -1477,7 +1471,8 @@ class WBInterface(object):
     def send_act_macro(self, sys, code, ext='py', comp='Model'): 
         """
         !!!!THIS IS WiP AND NOT FUNCTIONAL!!!!
-        Sends Python/JScript code to Mechanical in-build macro executor.
+        Sends Python/JScript code to Mechanical in-build macro executor
+        
         Arg:
             sys: str; specify a Mechanical system, e.g. 'SYS'
             code: str; code to execute
@@ -1510,7 +1505,7 @@ class WBInterface(object):
     # --------------------------------------------------------------------     
     def send_act_macfile(self, mech_sys, filename, mech_comp='Model', ignore_js_err=False): 
         """
-        Executes a macro file using Mechanical in-build macro executor.
+        Executes a macro file using Mechanical in-build macro executor
         
         Arg:
             mech_sys: str; specify a Mechanical system, e.g. 'SYS'
@@ -1675,23 +1670,19 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     def _send_js_macro(self, sys, code, comp='Model', visible=False):
         """
-        Executes JS macro. This method is used for all interactions with Mechanical.
+        Executes JS macro. This method is used for all interactions with Mechanical
         
-        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables.
+        Note: when executing JS via SendCommand() 'DS.' namespcae is not availables
         This method replaces all references to 'DS' with 'WB.AppletList.Applet("DSApplet").App'
         which will allow JS macro execution. This method does NOT support macro from file!
-        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename. 
+        Try to pass 'DS.Script.doToolsRunMacro()' with appropriate filename
         
         Arg:
             sys: str; specify a Mechanical system, e.g. 'SYS'
             code: str; JS macro string
             comp: str; module to open
         """
-    
-        # filepath = workbench.GetUserFilesDirectory()
-        # filename = os.path.join(filepath,'wb_mac.js')
-        # with open(filename, 'w') as f:
-            # f.write(code)
+
         if not self.__active:
             self._log_('Cannot send js macro: No active project found!', 1)
             raise NoActiveProjectFound
@@ -1714,21 +1705,19 @@ class WBInterface(object):
         else:
             self._log_('Finished', 1)
             return True
-    
+    # -------------------------------------------------------------------- 
     def _clear_DPs(self):
-        
+        """Delete pre-existing Design Points"""
         dps = self._get_DPs()
         for dp in dps:
-            try:
-                dp.Delete()
-            except:
-                pass
+            try: dp.Delete()
+            except: pass
             
         self.__DPs = self._get_DPs()
         self.__DPs_present = len(self.__DPs)
     # --------------------------------------------------------------------     
     def _input_list_by_name(self, inp):
-        """Read from list method"""
+        """Read parameters from list"""
         self._log_('Reading input parameters values from list...')
         self._param_in_value = defaultdict(list)
         self.__DPs_imported = 0
@@ -1744,7 +1733,7 @@ class WBInterface(object):
         self.__DPs_imported = len(self._param_in_value[key.upper()])
     # --------------------------------------------------------------------     
     def _input_dict_by_name(self, inp):
-        """Read from dict method"""
+        """Read parameters from dict"""
         self._log_('Reading input parameters table...')
         self._param_in_value = defaultdict(list)
         self._param_in = []
@@ -1761,6 +1750,7 @@ class WBInterface(object):
         self.__DPs_imported = len(self._param_in_value[key.upper()])
     # -------------------------------------------------------------------- 
     def _output_group_by_DPs(self):
+        """Returns output parameters as list grouped by Design Points"""
         res = [[0]*len(self._param_out_value) for x in xrange(self.__DPs_present)]
         for i in xrange(self.__DPs_present):
             for j, key in enumerate(self._param_out):
@@ -1772,13 +1762,15 @@ class WBInterface(object):
         self._log_('Project Saved', 1)
     # --------------------------------------------------------------------     
     def _set_parameter(self, dp, name, value):
+        """Sets the value of Workbench parameter"""
         dp.SetParameterExpression(Parameter=self._get_parameter(name), Expression=value)			
         
     def _get_parameter_value(self, dp, name):
+        """Gets the value of Workbench parameter"""
         return str(dp.GetParameterValue(self._get_parameter(name)).Value)
     # -------------------------------------------------------------------- 
     def _get_DPs(self):
-        """Get Design Points list from project."""
+        """Get Design Points list from project"""
         if self.__active:
             return workbench.Parameters.GetAllDesignPoints()
         else:
@@ -1786,7 +1778,7 @@ class WBInterface(object):
             raise NoActiveProjectFound
     # --------------------------------------------------------------------         
     def _add_DP(self, exported=True, retained=True):
-        """Design Points list."""
+        """Design Points list"""
         if self.__active:
             dp =  workbench.Parameters.CreateDesignPoint(Exported=exported, Retained=retained)
             self.__DPs.append(dp)
@@ -1794,6 +1786,7 @@ class WBInterface(object):
         else:
             self._log_('Cannot add Design Point: No active project found!', 1)
             raise NoActiveProjectFound
+            
     # ---------------------------------------------------------------		
     # Static methods
     # ---------------------------------------------------------------
@@ -1892,9 +1885,7 @@ class WBInterface(object):
     
     @staticmethod
     def _get_parameter(name):
-        """
-        Gets Workbench Parameter object with name 'name'
-        """
+        """Gets Workbench Parameter object with name 'name'"""
         return workbench.Parameters.GetParameter(Name=name)	
     # ---------------------------------------------------------------   
     @staticmethod
@@ -1910,9 +1901,7 @@ class WBInterface(object):
     # ---------------------------------------------------------------
     @staticmethod
     def _winpath_js(dirpath):
-        """
-        Make all back slashes into double to send into JS
-        """
+        """Make all back slashes into double to send into JS"""
         return os.path.join(dirpath, '').replace('\\', '\\\\')
     # ---------------------------------------------------------------    
     @staticmethod
@@ -1923,9 +1912,9 @@ class WBInterface(object):
 #__________________________________________________________
 class AsyncLogChecker(object):
     """
-    .NET
-    Class used for pulling text from files.
-    Does not support pulling info from several concurrent files!
+    Uses .NET threading
+    Class used for pulling text from files
+    Pulls text from a file until it stops existing. Searches for a next file after that
     Arg:
         outfile: str; if empty, write to logger files
         watch_dir: str; upper level dir, watch file will be searched in all child dirs
@@ -1934,7 +1923,8 @@ class AsyncLogChecker(object):
         logger: Logger class
         divider: bool; print divider between files
     """
-    __version__ = '0.0.7'
+    __version__ = '0.0.8'
+    __watcher_count = 0
     
     # ---------------------------------------------------------------		
     # Magic methods
@@ -1943,8 +1933,11 @@ class AsyncLogChecker(object):
     def __init__(self, outfile, watch_dir, watchfile, timer=0.5, logger = None,
                  div_symbol='@', div_length=35, console=True):            
                     
+        self.__watcher_count += 1
+        self.__watcher_id = self.__watcher_count
+        
         self._logger = logger if logger is not None else Logger('log.txt')
-        log_prefix = str(self.__class__.__name__)
+        log_prefix = str('{} <{}>'.format(self.__class__.__name__, self.__watcher_id))
 
         self._log_ = partial(self._logger.log, info=log_prefix) 
         
@@ -1952,8 +1945,10 @@ class AsyncLogChecker(object):
         self.dir = watch_dir
         self.wait = timer*1000       
         self.watchfile = watchfile
+        
 
         self.__thread = None     
+        self._log_('New watcher created <{}>'.format(self.__watcher_id))
         self._log_('Class version: ' + self.__version__ , 1)
         self._div_symbol = div_symbol
         self._div_length = div_length
@@ -1962,7 +1957,7 @@ class AsyncLogChecker(object):
         self.__current_file = ''
         self.__current_position = 0     
         self.__is_watching = False 
-            
+           
         
         if self.outfile:
             with open(self.outfile, 'w') as f: pass
@@ -1986,12 +1981,12 @@ class AsyncLogChecker(object):
             self.__thread = Thread(ThreadStart(self.__main))
             self._log_('Start watching every {} sec'.format(self.wait/1000))
             self._log_('Watch directories: {}'.format(self.dir))
-            self._log_('Watch for: {}'.format(self.watchfile))
+            self._log_('Watch files: {}'.format(self.watchfile))
             self._log_('Output file: {}'.format(actual_outfile), 1)
-            self._log_('Searching for new watch file...')
+            self._log_('Searching for a new watch file...')
             self.__thread.Start()
         else:
-            self._log_('Thread is already running!')
+            self._log_('Cannot execute start command: watcher is already running!')
             
     # ---------------------------------------------------------------		
     # Private methods
@@ -2000,7 +1995,7 @@ class AsyncLogChecker(object):
         """Main execution function"""
         # ---------------------------------------------------------------
         def msg_end(num, symbol, s_len):
-            """Divider message"""
+            """Divider message between files"""
             msg_main = 'FILE %s END' % num
             msg_div = symbol * (s_len*2 + len(msg_main)) + '\n'
             msg_brace = symbol * s_len 
@@ -2015,13 +2010,13 @@ class AsyncLogChecker(object):
                 if not self.__current_file:
                     if self.__current_position:
                         self._logger.blank()
-                        self._log_('Searching for new watch file...')
                         if self._div_symbol:
                             args = dict(num=self.__file_cnt, symbol=self._div_symbol, s_len=self._div_length)
                             if self.outfile:
                                 with open(self.outfile, 'a') as g: g.write(msg_end(**args))
-                            else: self._log_(msg_end(**args), 2)
-                            
+                            else: self._log_(msg_end(**args), 2)                          
+                        self._log_('Searching for a new watch file...')
+                        
                     self.__current_position = 0
                     
                     file_list = self.re_glob(self.dir, self.watchfile) 
