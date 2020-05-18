@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.7'
+__version__ = '3.0.7a'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.6'
+    __version__ = '3.0.6a'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1074,7 +1074,7 @@ class WBInterface(object):
             self._log_('Unsupported file extention!', 1)
             return False
         
-        self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
+        self._log_('Saving mesh view in {}'.format(os.path.join(fpath, filename)))      
         if not os.path.exists(fpath): os.makedirs(fpath)
                     
         jsfun = self.__jsfun_savepics() + '''
