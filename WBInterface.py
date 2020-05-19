@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.7a'
+__version__ = '3.0.7b'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.6a'
+    __version__ = '3.0.6b'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -190,7 +190,6 @@ class WBInterface(object):
         self._log_('Class version: ' + self.__version__ )
         
         self.log = self._logger.log					#: original logger method
-        self.blank = self._logger.blank
         self._out_file = out_file					#: file for outputting
         self._full_file = full_report_file			#: file for workbench parametric report
         self._control_file = None					#: csv file with io parameter list
@@ -215,6 +214,9 @@ class WBInterface(object):
         self.__failed_to_open = False
         self.__not_up_to_date = False
         
+        self.blank = self._logger.blank
+        self.runtime = self._logger.runtime
+        
         try: ver = workbench.GetFrameworkBuildVersion().split('.')
         except: ver = '0'
         
@@ -230,6 +232,7 @@ class WBInterface(object):
             searcher = ManagementObjectSearcher("Select * from Win32_Processor").Get()
             for i in searcher: self.__machine_core_count = int(i["NumberOfCores"])
         except: self.__machine_core_count = 0
+        
         # Search for logs in this directories
         dir = [
             os.path.join(os.getcwd(),'_ProjectScratch')
@@ -249,10 +252,8 @@ class WBInterface(object):
         self.start_logwatch = self.__async_log.start
         self.stop_logwatch = self.__async_log.stop
         
-        try: self.runtime = self._logger.runtime
-        except: self.runtime = None
         
-        
+             
     # --------------------------------------------------------------------        
     def __del__(self):   
         if self.__macro_dir_path and os.path.exists(__macro_dir_path):
@@ -312,9 +313,9 @@ class WBInterface(object):
                                 for rlin in row:
                                     skip = rlin.lower().find(csv_skip)
                                     if i == 0 and skip == -1:
-                                        self._param_in.append(rlin.strip().upper())
+                                        self._param_in.append(self._safeguard(rlin))
                                     elif i == 1 and skip == -1:
-                                        self._param_out.append(rlin.strip().upper())
+                                        self._param_out.append(self._safeguard(rlin))
                     except Exception as err_msg:
                         self._log_('An error occured wile reading control file!')
                         self._log_(err_msg, 1)
@@ -445,8 +446,8 @@ class WBInterface(object):
         for row in inp:
             for key, elem in zip(vkeys, row):
                 elem_s = str(elem).strip()
-                self._param_in.append(key.strip().upper())
-                self._param_in_value[key.strip().upper()].append(elem_s)
+                self._param_in.append(self._safeguard(key))
+                self._param_in_value[self._safeguard(key)].append(elem_s)
         self.__DPs_imported = len(inp)
         self._log_('Input successful: {} input(s) in {} Design Point(s)'.format(len(self._param_in),self.__DPs_imported), 1)		
     # --------------------------------------------------------------------     
@@ -649,9 +650,10 @@ class WBInterface(object):
             self._log_('No output parameters specified!')
             raise AttributeError
             
+
         self._param_out_value = defaultdict(list)
         try:		
-            self._param_out = [par.upper() for par in out_par]
+            self._param_out = [self._safeguard(par) for par in out_par]
         except Exception as err_msg:
             self._log_('Failed to set parameters!')
             self._log_(err_msg, 1)
@@ -1725,12 +1727,12 @@ class WBInterface(object):
         try:
             for key, row in zip(self._param_in, inp_str):
                 for elem in self._listify(row):
-                    self._param_in_value[key.upper()].append(elem.strip())
+                    self._param_in_value[self._safeguard(key)].append(elem.strip())
         except Exception as err_msg:
             self._log_('An error occured while processing input!')
             self._log_(err_msg, 1)
             raise
-        self.__DPs_imported = len(self._param_in_value[key.upper()])
+        self.__DPs_imported = len(self._param_in_value[self._safeguard(key)])
     # --------------------------------------------------------------------     
     def _input_dict_by_name(self, inp):
         """Read parameters from dict"""
@@ -1740,14 +1742,14 @@ class WBInterface(object):
         self.__DPs_imported = 0
         try:
             for key, row in inp.items():
-                self._param_in.append(key.upper())
+                self._param_in.append(self._safeguard(key))
                 for elem in self._listify(row):
-                    self._param_in_value[key.upper()].append(str(elem).strip())
+                    self._param_in_value[self._safeguard(key)].append(str(elem).strip())
         except Exception as err_msg:
             self._log_('An error occured while processing input!')
             self._log_(err_msg, 1)
             raise
-        self.__DPs_imported = len(self._param_in_value[key.upper()])
+        self.__DPs_imported = len(self._param_in_value[self._safeguard(key)])
     # -------------------------------------------------------------------- 
     def _output_group_by_DPs(self):
         """Returns output parameters as list grouped by Design Points"""
@@ -1887,6 +1889,13 @@ class WBInterface(object):
     def _get_parameter(name):
         """Gets Workbench Parameter object with name 'name'"""
         return workbench.Parameters.GetParameter(Name=name)	
+    
+    @staticmethod    
+    def _safeguard(inp):
+        """A safeguard if a 'P' is missing"""
+        return inp.strip().upper() if inp.strip()[0].upper() == 'P' else 'P' + inp.strip()
+           
+        
     # ---------------------------------------------------------------   
     @staticmethod
     def _try_wrapper_js(code):
