@@ -43,34 +43,68 @@ if __name__ == '__main__':
     print('CWD: ' + os.getcwd())
     print('File: ' + filepath)
     cwdp = lambda x: os.path.join(filedir, x)
-    #__________________________________________________________    
+    #__________________________________________________________
+    
+    wb = WBInterface()
 
     try:
-        wb = WBInterface()
-        
         wb.open_any(archive_first=True)
         wb.find_and_import_parameters()
         
-        """ Set number of cores to max available on this machine using system SYS
-        Replace 'SYS' with any other mechanical system.
-        This works only with new ribbon interface, which means ANSYS 2019R2 or higher!
-        """
-        # wb.set_cores_number('SYS')          
+        #----------------------------------------------------------------
+        # Parameters can be imported directly
+        # input_p = {'p1':[1, 2, 3], 'p2':[10, 20, 30]}
+        # wb.input_by_name(input_p)
+        # output_p = ['p1', 'p3', 'p4']
+        # wb.set_output(output_p)
         
-        """Turn on DMP solver using system SYS
-        Replace 'SYS' with any other mechanical system
-        This works only with new ribbon interface, which means ANSYS 2019R2 or higher!
-        """
-        # wb.set_distributed('SYS', True) 
+        # wb.import_parameters()
+        #============================================================================== 
+        # Sets maximum number of cores
+        # wb.set_cores_number('SYS')   
+        
+        # Activate distrubuted solver
+        # wb.set_distributed('SYS', True)
+        
+        # Sets unit system
+        # wb.set_unit_system('SYS', unit_sys='NMM')
+        #============================================================================== 
         
         wb.update_project()
         
-        """ Try to open SYS and save all Figures (NOT PLOTS!) from a project tree.
-        This includes all connected projects which share 'Model' since they are displayed 
-        in the same tree.
-        This was tested only on ANSYS with new ribbon interface!
-        """
-        # wb.save_figures('SYS', os.path.join(filedir, 'pictures'), width=1920, height=1080, fontfact=1.35)
+        #============================================================================== 
+        # Set figure scale 
+        # wb.set_figures_scale('SYS', scale='auto') 
+        
+        # Picture parameters
+        # overview_args = dict(width=1920, height=1080, zoom_to_fit=True)
+        # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True)
+        # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5)
+        # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35)
+        
+        # Save pictures parameters
+        # wb.save_overview('SYS', cwdp('pictures'), 'model_overview.jpg', **overview_args) 
+        # wb.save_mesh_view('SYS', cwdp('pictures'), 'mesh.png', **mesh_args) 
+        # wb.save_setups_view('SYS', cwdp('pictures'), **env_args) 
+        # wb.save_figures('SYS', cwdp('pictures'), **fig_args) 
+        
+        #----------------------------------------------------------------
+        # Can also save for each Design Point
+        # for i, dp in enumerate(wb.DPs):
+            # wb.set_active_DP(dp)
+            
+            # mesh_file = 'mesh_DP{}.png'.format(i)
+            # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True)
+            # wb.save_mesh_view('SYS', cwdp('pictures'), mesh_file, **mesh_args)
+
+            # fig_pref = 'Result_DP{}'.format(i)
+            # fig_args = dict(fpref=fig_pref, width=1920*2, height=1080*2, zoom_to_fit=True, fontfact=1.35)
+            # wb.save_figures('SYS', cwdp('pictures'), **fig_args) 
+        
+            # env_pref = 'Setup_DP{}'.format(i)
+            # env_args = dict(fpref=env_pref, width=1920, height=1080, zoom_to_fit=True, fontfact=1.5)
+            # wb.save_setups_view('SYS', cwdp('pictures'), **env_args) 
+        #============================================================================== 
         
         wb.output_parameters()
         wb.export_wb_report()
