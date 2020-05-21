@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.7b'
+__version__ = '3.0.7c'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.6b'
+    __version__ = '3.0.6c'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1893,6 +1893,7 @@ class WBInterface(object):
     @staticmethod    
     def _safeguard(inp):
         """A safeguard if a 'P' is missing"""
+        inp = str(inp)
         return inp.strip().upper() if inp.strip()[0].upper() == 'P' else 'P' + inp.strip()
            
         
