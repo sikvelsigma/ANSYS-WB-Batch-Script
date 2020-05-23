@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.7c'
+__version__ = '3.0.8'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.6c'
+    __version__ = '3.0.7'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1032,8 +1032,8 @@ class WBInterface(object):
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        jsmain = 'DumpOverview("{}", {}, {}, {}, {}, "{}", {});'.format(self._winpath_js(fpath), height, width, fontfact, 
-                                                              self._bool_js(zoom_to_fit), basename, mode)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode)
+        jsmain = 'DumpOverview("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1111,8 +1111,8 @@ class WBInterface(object):
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        jsmain = 'DumpMesh("{}", {}, {}, {}, {}, "{}", {});'.format(self._winpath_js(fpath), height, width, fontfact, 
-                                                              self._bool_js(zoom_to_fit), basename, mode)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode)
+        jsmain = 'DumpMesh("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1178,7 +1178,8 @@ class WBInterface(object):
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''                        
-        jsmain = 'DumpSetups("{}", {}, {}, {}, {}, "{}");'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
+        jsmain = 'DumpSetups("{}", {}, {}, {}, {}, "{}");'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1225,6 +1226,10 @@ class WBInterface(object):
                     return;
                 var numObjs = activeObjs.Count;
                 
+                // Activate slice (unused)
+                // var slice = DS.Graphics.SliceTool;
+                // slice.Enabled(1) = false;
+                
                 var prevColor1 = DS.Graphics.Scene.Color(1); 
                 var prevColor2 = DS.Graphics.Scene.Color(2);
                 var prevColor5 = DS.Graphics.Scene.Color(5);
@@ -1247,7 +1252,8 @@ class WBInterface(object):
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}");'.format(self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
+        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}");'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1259,7 +1265,204 @@ class WBInterface(object):
             self._log_(err_msg, 1) 
             return False
         else: return True
-   
+   # -------------------------------------------------------------------- 
+    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", zoom_to_fit=False, module='Model', ignore_js_err=False):
+        """
+        Saves all results animations with 'ani' in their name
+        
+        Arg:
+            container: str; specify a Mechanical system, e.g. 'SYS'
+            fpath: str; save directory
+            fpref: str, file name prefix
+            width: float; width of a picture, defaults to Workbench default
+            height: float; height of a picture, defaults to Workbench default
+            scale: animations scale factor
+            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            module: str; module to open
+            ignore_js_err: bool; wraps js main cammands in a try block
+        """
+        scale_arg, _ = self._scale_eval(scale)
+        
+        if width < 0 or height < 0 or not scale_arg:
+            self._log_('Incorrect animation parameters!')
+            return False   
+           
+        self._log_('Saving all animations in {}'.format(fpath))
+        
+        if not os.path.exists(fpath): os.makedirs(fpath)
+        
+        jsfun = self.__jsfun_setscale() + '''
+            function doAnimationFilename(fName, pHeight, pWidth)
+            {
+                var avi = /.avi$/i;   // $=end of string,  i=case insensitive
+                var mp4 = /.mp4$/i;
+                var wmv = /.wmv$/i;
+                var gif = /.gif$/i;
+
+                var avimode = 3;
+                var mp4mode = 1;
+                var wmvmode = 2;
+                var gifmode = 4;
+                var imode = 1;
+
+                g_AnalyticsEnabled = 1;
+                if (fName.search(avi) > -1)
+                {
+                    imode = avimode;
+                    if (g_AnalyticsEnabled) WB.FireEvent("Analytics.Action", "ExportResultAnimationAVI");
+                }
+                else if (fName.search(mp4) > -1)
+                {
+                    imode = mp4mode;
+                    if (g_AnalyticsEnabled) WB.FireEvent("Analytics.Action", "ExportResultAnimationMP4");
+                }
+                else if (fName.search(wmv) > -1)
+                {
+                    imode = wmvmode;
+                    if (g_AnalyticsEnabled) WB.FireEvent("Analytics.Action", "ExportResultAnimationWMV");
+                }
+                else if (fName.search(gif) > -1) {
+                    imode = gifmode;
+                    if (g_AnalyticsEnabled) WB.FireEvent("Analytics.Action", "ExportResultAnimationGIF");
+                }
+                var anim = DS.Graphics.AnimationControl;
+                if(!anim)   return;
+                anim.Stop();
+
+                if(fName != "")
+                {
+                    var worksheetActive = DS.Script.isWorksheetWindowActive();
+                    if (worksheetActive)
+                        geometryPane.Visible = true;
+
+                    var saveAnimStyle = anim.AnimationStyle;
+                    anim.AnimationStyle = 1;
+
+                    DS.Script.beginWaitCursor();
+                    try
+                    {
+                        DS.Graphics.Redraw(1);
+                        
+                        anim.SetExportStreamWidthHeight(pWidth, pHeight);
+                        if (g_AnalyticsEnabled) WB.FireEvent("Analytics.Action", "ExportCustomResolution");
+
+                        DS.Graphics.Redraw(1);
+                        //debugger;
+                        anim.SaveToFile(fName, imode);                                         
+                    }
+                    catch (error)
+                    {
+                    }
+                    DS.Script.endWaitCursor();
+
+                    // Reactivate worksheet if it was active.
+                    if (worksheetActive)
+                        worksheetPane.Visible = true;
+
+                    anim.AnimationStyle = saveAnimStyle;
+                    DS.Graphics.Redraw(1);
+                }
+            }
+            
+            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pPref){                              
+                var clsidEnv = 105; // load cases
+                var clsidRes = 520; // results
+
+                var pExt = ".gif";
+
+                var activeObjs = DS.Tree.AllObjects;
+                if (!activeObjs)
+                    return;              
+
+                var numObjs = activeObjs.Count;
+                var image = DS.Graphics.ImageCaptureControl;
+                
+                var ani = /ani/i;
+
+                var cntFigures = 0;
+                
+                for (var i = 1; i <= numObjs; i++) {
+                    var objActive = activeObjs.Item(i);
+                    var objName = objActive.Name;
+                    
+                    if (objActive && objActive.ID && (objActive.Class == clsidRes) && (objName.search(ani) > -1))
+                    {
+                        DS.Graphics.Draw2(objActive.ID);
+                        //debugger;
+                        if (!cntFigures){
+                            setScaleValue(pScale);
+                            DS.Graphics.Redraw(1);
+                            DS.Graphics.Draw2(objActive.ID);
+                        }
+
+                        var prevColor1 = DS.Graphics.Scene.Color(1); 
+                        var prevColor2 = DS.Graphics.Scene.Color(2);
+                        var prevColor5 = DS.Graphics.Scene.Color(5);
+                        var prevColor6 = DS.Graphics.Scene.Color(6);
+
+                        var prevLegend = DS.Graphics.LegendVisibility;
+                        var prevRuler = DS.Graphics.RulerVisibility;
+                        var prevTriad = DS.Graphics.TriadOn;
+
+                        DS.Graphics.Scene.Color(1) = 0x00ffffff;
+                        DS.Graphics.Scene.Color(2) = 0x00ffffff;
+                        DS.Graphics.Scene.Color(5) = prevColor5; 
+                        DS.Graphics.Scene.Color(6) = prevColor6; 
+
+                        DS.Graphics.TriadOn = true;
+                        DS.Graphics.LegendVisibility = true; 
+                        DS.Graphics.RulerVisibility = false;
+
+                        if (pFit) {
+                            DS.Graphics.setisoview(7);
+                            DS.Script.doGraphicsFit();     
+                            DS.Graphics.RescaleAnnotation();
+                            DS.Graphics.Redraw(1);
+                        }
+                        
+                        var picEnum = ("00" + cntFigures).slice (-3);
+                        var nameParent = (objActive.Name).replace(/ |_/g, '-');
+                        
+                        try {
+                            var objSearch = objActive.Parent;
+                            while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
+                            var nameSolution = (objSearch.Name).replace(/ |_/g, '-');
+                            nameSolution = nameSolution + "_";
+                        } 
+                        catch (err) {
+                            var nameSolution = "";
+                        }
+
+                        nameFull = (pPref + "_" + picEnum + "_" + nameSolution + nameParent + pExt);
+
+                        doAnimationFilename(pdir + nameFull, pHeight, pWidth);
+
+                        DS.Graphics.Scene.Color(1) = prevColor1;
+                        DS.Graphics.Scene.Color(2) = prevColor2;
+                        DS.Graphics.Scene.Color(5) = prevColor5;
+                        DS.Graphics.Scene.Color(6) = prevColor6;
+                        DS.Graphics.LegendVisibility = prevLegend;
+                        DS.Graphics.RulerVisibility = prevRuler;
+                        DS.Graphics.TriadOn = prevTriad;  
+
+                        cntFigures++;
+                    }
+                }
+            }
+        '''
+        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), fpref)
+        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, "{}");'.format(*args)
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+            return False
+        else: return True
     # -------------------------------------------------------------------- 
     def set_unit_system(self, container, unit_sys, module='Model', ignore_js_err=True):
         """
@@ -1364,33 +1567,13 @@ class WBInterface(object):
             self._log_('Older ANSYS versions do not support this function!', 1)
             return False
         
-        strwrap = lambda x: '"{}"'.format(x)
-        undf_st = ('undef','undeformed')
-        act_st = ('actual', 'true')
+        arg, msg = self._scale_eval(scale)
+
+        if not arg: return False
         
-        if isinstance(scale, str):
-            arg = strwrap(scale)
-            if scale == 'auto'       : msg = 'auto'               
-            elif scale == '2auto'    : msg = 'double auto'               
-            elif scale == '5auto'    : msg = 'five auto'                
-            elif scale in undf_st    : msg = 'undeformed'               
-            elif scale == '0.5auto'  : msg = 'half auto'               
-            elif scale in act_st     : msg = 'true scale'
-                
-            else:
-                self._log_('Incorrect scale!')
-                return False
-        else:
-            arg = scale
-            msg = scale
-            if scale < 0: 
-                self._log_('Incorrect scale!')
-                return False
-                     
-            
         self._log_('Setting figures scale to {}'.format(msg))
         
-        jsfun = '''
+        jsfun = self.__jsfun_setscale() + '''
             function setScale(pScale) {    
                 var clsidFigure = 147; // figures
                 
@@ -1408,49 +1591,7 @@ class WBInterface(object):
                     {
                         DS.Graphics.Draw2(objActive.ID);
 
-                        if (!isNaN(pScale)) {       		   
-                            DS.Script.setTextResultScale(pScale);    			
-                        } else {
-                            var mode = 0;
-                            switch(pScale)
-                            {
-                                case "undef"      :
-                                    mode = 0;   // Undeformed
-                                    break;
-                                    
-                                case "undeformed" :
-                                    mode = 0;   // Undeformed
-                                    break;
-
-                                case "actual"     :
-                                    mode = 1;   // Actual
-                                    break;
-                                    
-                                case "true"     :
-                                    mode = 1;   // Actual
-                                    break;    
-
-                                case "0.5auto"    :
-                                    mode = 2;   // HalfAuto
-                                    break;
-
-                                case "auto"       :
-                                    mode = 3;   // Automatic
-                                    break;
-
-                                case "2auto"      :
-                                    mode = 4;   // TwiceAuto
-                                    break;
-
-                                case "5auto"      :
-                                    mode = 5;   // FiveAuto
-                                    break;
-
-                                default :
-                                    return;
-                            }
-                            DS.Script.setResultScale(mode);
-                        }                       
+                        setScaleValue(pScale);                       
                     }
                 }
                 DS.Graphics.StreamMode = 0; 
@@ -1469,6 +1610,7 @@ class WBInterface(object):
             self._log_(err_msg, 1) 
             return False
         else: return True
+               
     # -------------------------------------------------------------------- 
     def send_act_macro(self, sys, code, ext='py', comp='Model'): 
         """
@@ -1548,6 +1690,61 @@ class WBInterface(object):
                 self._log_('Macro execution finished', 1)
                 return True
     
+    # --------------------------------------------------------------------    
+    @staticmethod
+    def __jsfun_setscale():
+        """
+        JS functions used to set scale
+        """
+        return '''
+        function setScaleValue(pScale){
+            if (!isNaN(pScale)) {       		   
+                DS.Script.setTextResultScale(pScale);    			
+            } 
+            else {
+                var mode = 0;
+                switch(pScale)
+                {
+                    case "undef"      :
+                        mode = 0;   // Undeformed
+                        break;
+                        
+                    case "undeformed" :
+                        mode = 0;   // Undeformed
+                        break;
+
+                    case "actual"     :
+                        mode = 1;   // Actual
+                        break;
+                        
+                    case "true"     :
+                        mode = 1;   // Actual
+                        break;    
+
+                    case "0.5auto"    :
+                        mode = 2;   // HalfAuto
+                        break;
+
+                    case "auto"       :
+                        mode = 3;   // Automatic
+                        break;
+
+                    case "2auto"      :
+                        mode = 4;   // TwiceAuto
+                        break;
+
+                    case "5auto"      :
+                        mode = 5;   // FiveAuto
+                        break;
+
+                    default :
+                        return;
+                }
+                DS.Script.setResultScale(mode);
+            }
+        }
+        '''
+    # -------------------------------------------------------------------- 
     @staticmethod
     def __jsfun_savepics():
         """
@@ -1707,6 +1904,31 @@ class WBInterface(object):
         else:
             self._log_('Finished', 1)
             return True
+    # --------------------------------------------------------------------    
+    def _scale_eval(self, value):
+        strwrap = lambda x: '"{}"'.format(x)
+        undf_st = ('undef','undeformed')
+        act_st = ('actual', 'true')
+        
+        if isinstance(value, str):
+            arg = strwrap(value)
+            if value == 'auto'       : msg = 'auto'               
+            elif value == '2auto'    : msg = 'double auto'               
+            elif value == '5auto'    : msg = 'five auto'                
+            elif value in undf_st    : msg = 'undeformed'               
+            elif value == '0.5auto'  : msg = 'half auto'               
+            elif value in act_st     : msg = 'true scale'
+                
+            else:
+                self._log_('Incorrect scale!')
+                return False, False
+        else:
+            arg = value
+            msg = value
+            if value < 0: 
+                self._log_('Incorrect scale!')
+                return False, False
+        return arg, msg
     # -------------------------------------------------------------------- 
     def _clear_DPs(self):
         """Delete pre-existing Design Points"""
