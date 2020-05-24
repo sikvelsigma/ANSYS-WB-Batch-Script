@@ -18,10 +18,8 @@ def find_module(st_in):
             print('Found: {}'.format(srch))
             srch = srch[0] if srch[0] == '{}.py'.format(st) else srch[-1]
             srch = srch.replace('.py','')
-        except:
-            res.append(None)
-        else:
-            res.append(srch)
+        except: res.append(None)
+        else: res.append(srch)
     return tuple(res) if len(stlist) > 1 else res[0]
     
 
@@ -81,12 +79,15 @@ if __name__ == '__main__':
         # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True)
         # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5)
         # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35)
+        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto')
+        
         
         # Save pictures parameters
         # wb.save_overview('SYS', cwdp('pictures'), 'model_overview.jpg', **overview_args) 
         # wb.save_mesh_view('SYS', cwdp('pictures'), 'mesh.png', **mesh_args) 
         # wb.save_setups_view('SYS', cwdp('pictures'), **env_args) 
         # wb.save_figures('SYS', cwdp('pictures'), **fig_args) 
+        # wb.save_animations('SYS', cwdp('animations'), **ani_args)
         
         #----------------------------------------------------------------
         # Can also save for each Design Point
