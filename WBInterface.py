@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.8'
+__version__ = '3.0.8a'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.7'
+    __version__ = '3.0.7a'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -147,7 +147,6 @@ class WBInterface(object):
     @property
     def not_up_to_date(self):
         """Returns if project is not up-to-date as bool"""
-        self.__not_up_to_date = not workbench.IsProjectUpToDate()
         return self.__not_up_to_date
         
     @property
@@ -1697,52 +1696,52 @@ class WBInterface(object):
         JS functions used to set scale
         """
         return '''
-        function setScaleValue(pScale){
-            if (!isNaN(pScale)) {       		   
-                DS.Script.setTextResultScale(pScale);    			
-            } 
-            else {
-                var mode = 0;
-                switch(pScale)
-                {
-                    case "undef"      :
-                        mode = 0;   // Undeformed
-                        break;
-                        
-                    case "undeformed" :
-                        mode = 0;   // Undeformed
-                        break;
+            function setScaleValue(pScale){
+                if (!isNaN(pScale)) {       		   
+                    DS.Script.setTextResultScale(pScale);    			
+                } 
+                else {
+                    var mode = 0;
+                    switch(pScale)
+                    {
+                        case "undef"      :
+                            mode = 0;   // Undeformed
+                            break;
+                            
+                        case "undeformed" :
+                            mode = 0;   // Undeformed
+                            break;
 
-                    case "actual"     :
-                        mode = 1;   // Actual
-                        break;
-                        
-                    case "true"     :
-                        mode = 1;   // Actual
-                        break;    
+                        case "actual"     :
+                            mode = 1;   // Actual
+                            break;
+                            
+                        case "true"     :
+                            mode = 1;   // Actual
+                            break;    
 
-                    case "0.5auto"    :
-                        mode = 2;   // HalfAuto
-                        break;
+                        case "0.5auto"    :
+                            mode = 2;   // HalfAuto
+                            break;
 
-                    case "auto"       :
-                        mode = 3;   // Automatic
-                        break;
+                        case "auto"       :
+                            mode = 3;   // Automatic
+                            break;
 
-                    case "2auto"      :
-                        mode = 4;   // TwiceAuto
-                        break;
+                        case "2auto"      :
+                            mode = 4;   // TwiceAuto
+                            break;
 
-                    case "5auto"      :
-                        mode = 5;   // FiveAuto
-                        break;
+                        case "5auto"      :
+                            mode = 5;   // FiveAuto
+                            break;
 
-                    default :
-                        return;
+                        default :
+                            return;
+                    }
+                    DS.Script.setResultScale(mode);
                 }
-                DS.Script.setResultScale(mode);
             }
-        }
         '''
     # -------------------------------------------------------------------- 
     @staticmethod
@@ -1851,7 +1850,7 @@ class WBInterface(object):
                 DS.Graphics.StreamMode = 0;  //so the geometry view will become visible again                                  
             }           
         '''
-    
+    # -------------------------------------------------------------------- 
     def send_js_macro(self, system, macro, component='Model', gui=False):
         """
         Use this to send commands to systems, calls Workbench SendCommand()
@@ -1864,9 +1863,11 @@ class WBInterface(object):
         """
         self._log_('Sending macros to Workbench system')
         self._send_js_macro(system, macro, comp=component, visible=gui)
+        
     # ---------------------------------------------------------------
     # Private methods
     # ---------------------------------------------------------------
+    
     def _send_js_macro(self, sys, code, comp='Model', visible=False):
         """
         Executes JS macro. This method is used for all interactions with Mechanical
