@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.0.8a'
+__version__ = '3.1.0'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.7a'
+    __version__ = '3.0.8'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -631,9 +631,87 @@ class WBInterface(object):
             self.__not_up_to_date = True
             self._log_('Project is not up-to-date, see messages below')
             for msg in workbench.GetMessages():
-                self._log_(msg.MessageType + ": " + msg.Summary)   
+                try: self._log_(msg.MessageType + ": " + msg.Summary)  
+                except: pass
             self._logger.blank()
         return True
+    # --------------------------------------------------------------------     
+    def archive_project(self, filename=None, save_external_files=True, save_results=True, save_userfiles=True):
+        """
+        Archives Workbench project
+        
+        
+        Arg:
+            filename: str, archive filename; can be relative or absolute, can be just a directory;
+                      defaults to project name with '_result' postfix            
+            save_external_files: bool, saves external files; defaults to True
+            save_results: bool, saves result files; defaults to True
+            save_userfiles: bool, saves files in user_files directory; defaults to True
+            
+        """
+        if not self.__active:
+            self._log_('Cannot archive project: No active project found!', 1)
+            raise NoActiveProjectFound                  
+        
+        self._save_project() 
+        
+        self._log_('Archiving Workbench project...')
+        
+        try:
+            if filename is None:
+                head, tail = os.path.split(self.__workfile)
+                # if not head: head = os.getcwd()
+                if not head: head = workbench.GetProjectDirectory()
+                
+                wbpz_name = tail.split('.')[0] + '_result'
+                wbpz_file = os.path.join(head, ('{}.{}').format(wbpz_name ,'wbpz'))
+                
+            elif filename:
+                head, tail = os.path.split(filename)
+                
+                if not tail: tail = os.path.basename(self.__workfile).replace('.wbpj','.wbpz')
+                    
+                if not head: head = workbench.GetProjectDirectory()
+                wbpz_name = tail.split('.')[0]
+                
+                try: ext = tail.split('.')[1]
+                except: ext = 'wbpz'
+                
+                wbpz_file = os.path.join(head, ('{}.{}').format(wbpz_name , ext))              
+            else:
+                self._log_('Cannot archive project: filename is missing!', 1)
+                return False
+        except Exception as err_msg:
+            self._log_('Cannot archive project: bad filename!')
+            self._log_(err_msg, 1)
+            return False
+            
+        args = dict(FilePath=wbpz_file, FailIfMissingFiles=False, IncludeExternalImportedFiles=bool(save_external_files), 
+                    IncludeSkippedFiles=bool(save_results), IncludeUserFiles=bool(save_userfiles))                                          
+        try:
+            workbench.Archive(**args)
+        except Exception as err_msg:
+            self._log_('Archiving failed!')
+            self._log_(err_msg, 1)
+            return False
+        else:
+            self._log_('Project archived successfully to {}'.format(wbpz_file), 1)
+            return True
+    
+     # --------------------------------------------------------------------     
+    def archive_if_complete(self, threshold_status=2):
+        """
+        Archives project if project status is less or equal to threshold_status
+        
+        Args:
+            threshold_status: int, see status() method for more information; defaults to 'FAILED TO UPDATE!' status
+        """
+        if not (0 <= threshold_status <= 4) or not isinstance(threshold_status, int):
+            self._log_('Cannot archive project: incorrect status threshold!', 1)
+            return False
+        if self.status(suppress=True) <= threshold_status: 
+            res = self.archive_project()
+            return res
     # --------------------------------------------------------------------    
     
     def set_output(self, out_par=None):
@@ -1017,7 +1095,7 @@ class WBInterface(object):
                 var prevTriad = DS.Graphics.TriadOn;
                 var prevRandom = DS.Graphics.RandomColors; 
                 
-                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);                                                                                                                        
+                prepocPicOutput(pHeight, pWidth, pFontFactor, prevColor5, prevColor6);
                 
                 //debugger;
                 // ====Make model overview====
@@ -1025,7 +1103,9 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = false; 
                 DS.Graphics.RulerVisibility = false;  
                 DS.Graphics.RandomColors = false;
+                DS.Script.beginWaitCursor();
                 saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode);                             
+                DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
@@ -1104,7 +1184,9 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = false; 
                 DS.Graphics.RulerVisibility = false;        
                 DS.Graphics.RandomColors = false; 
+                DS.Script.beginWaitCursor();
                 saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode);                             
+                DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
@@ -1171,8 +1253,9 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = true;
+                DS.Script.beginWaitCursor();               
                 saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0);
-              
+                DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
@@ -1245,8 +1328,9 @@ class WBInterface(object):
                 DS.Graphics.LegendVisibility = true; 
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = false;
+                DS.Script.beginWaitCursor();
                 saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0);
-                
+                DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
