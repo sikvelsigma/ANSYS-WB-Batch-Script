@@ -79,7 +79,7 @@ if __name__ == '__main__':
         # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True)
         # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5)
         # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35)
-        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto')
+        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto', frames=20)
         
         
         # Save pictures parameters

@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.0'
+__version__ = '3.1.1'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.8'
+    __version__ = '3.0.9'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1349,7 +1349,7 @@ class WBInterface(object):
             return False
         else: return True
    # -------------------------------------------------------------------- 
-    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", zoom_to_fit=False, module='Model', ignore_js_err=False):
+    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", frames=20, zoom_to_fit=False, module='Model', ignore_js_err=False):
         """
         Saves all results animations with 'ani' in their name
         
@@ -1375,7 +1375,7 @@ class WBInterface(object):
         if not os.path.exists(fpath): os.makedirs(fpath)
         
         jsfun = self.__jsfun_setscale() + '''
-            function doAnimationFilename(fName, pHeight, pWidth)
+            function doAnimationFilename(fName, pHeight, pWidth, pFrames)
             {
                 var avi = /.avi$/i;   // $=end of string,  i=case insensitive
                 var mp4 = /.mp4$/i;
@@ -1431,6 +1431,8 @@ class WBInterface(object):
 
                         DS.Graphics.Redraw(1);
                         //debugger;
+                        
+                        anim.NumberOfFrames = pFrames;
                         anim.SaveToFile(fName, imode);                                         
                     }
                     catch (error)
@@ -1447,7 +1449,7 @@ class WBInterface(object):
                 }
             }
             
-            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pPref){                              
+            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref){                              
                 var clsidEnv = 105; // load cases
                 var clsidRes = 520; // results
 
@@ -1518,7 +1520,7 @@ class WBInterface(object):
 
                         nameFull = (pPref + "_" + picEnum + "_" + nameSolution + nameParent + pExt);
 
-                        doAnimationFilename(pdir + nameFull, pHeight, pWidth);
+                        doAnimationFilename(pdir + nameFull, pHeight, pWidth, pFrames);
 
                         DS.Graphics.Scene.Color(1) = prevColor1;
                         DS.Graphics.Scene.Color(2) = prevColor2;
@@ -1533,8 +1535,8 @@ class WBInterface(object):
                 }
             }
         '''
-        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), fpref)
-        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, "{}");'.format(*args)
+        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), frames, fpref)
+        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, {}, "{}");'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
