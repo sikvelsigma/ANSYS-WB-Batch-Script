@@ -75,11 +75,11 @@ if __name__ == '__main__':
         # wb.set_figures_scale('SYS', scale='auto') 
         
         # Picture parameters
-        # overview_args = dict(width=1920, height=1080, zoom_to_fit=True)
-        # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True)
-        # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5)
-        # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35)
-        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto', frames=20)
+        # overview_args = dict(width=1920, height=1080, zoom_to_fit=True, view='iso')
+        # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True, view='iso')
+        # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5, view='iso')
+        # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35, view='iso')
+        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto', frames=20, view='iso')
         
         
         # Save pictures parameters

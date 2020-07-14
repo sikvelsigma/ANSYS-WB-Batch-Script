@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.1'
+__version__ = '3.1.2'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.0.9'
+    __version__ = '3.1.0'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1043,7 +1043,7 @@ class WBInterface(object):
         else: return True
     
     # -------------------------------------------------------------------- 
-    def save_overview(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_overview(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=True, view='iso', module='Model', ignore_js_err=True):
         """
         Saves model overview
         This is a modified ripped function from ANSYS to dump all figures in cwd
@@ -1055,7 +1055,8 @@ class WBInterface(object):
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
-            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            zoom_to_fit: bool, set zoom to fit for pictures
+            view: int or 'iso, sets image view
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
@@ -1074,11 +1075,17 @@ class WBInterface(object):
             self._log_('Unsupported file extention!', 1)
             return False
         
+        if view == 'iso': view = -1
+        elif not view: view = 0
+        elif not isinstance(view, int):
+            self._log_('Incorrect view identifier!', 1)
+            return False
+        
         self._log_('Saving model overview in {}'.format(os.path.join(fpath, filename)))      
         if not os.path.exists(fpath): os.makedirs(fpath)
                     
         jsfun = self.__jsfun_savepics() + '''
-            function DumpOverview(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode) {                                          
+            function DumpOverview(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode, pView) {                                          
                 var clsidModel = 104; // model
                
                 var activeObjs = DS.Tree.AllObjects;
@@ -1104,15 +1111,15 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;  
                 DS.Graphics.RandomColors = false;
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode);                             
+                saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode, pView);                             
                 DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode)
-        jsmain = 'DumpOverview("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode, view)
+        jsmain = 'DumpOverview("{}", {}, {}, {}, {}, "{}", {}, {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1125,7 +1132,7 @@ class WBInterface(object):
             return False
         else: return True
     # -------------------------------------------------------------------- 
-    def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_mesh_view(self, container, fpath, filename, width=0, height=0, fontfact=1, zoom_to_fit=True, view='iso', module='Model', ignore_js_err=True):
         """
         Saves mesh view
         
@@ -1136,7 +1143,8 @@ class WBInterface(object):
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
-            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            zoom_to_fit: bool, set zoom to fit for pictures
+            view: int or 'iso, sets image view
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """  
@@ -1154,12 +1162,18 @@ class WBInterface(object):
         else:
             self._log_('Unsupported file extention!', 1)
             return False
+            
+        if view == 'iso': view = -1
+        elif not view: view = 0
+        elif not isinstance(view, int):
+            self._log_('Incorrect view identifier!', 1)
+            return False
         
         self._log_('Saving mesh view in {}'.format(os.path.join(fpath, filename)))      
         if not os.path.exists(fpath): os.makedirs(fpath)
                     
         jsfun = self.__jsfun_savepics() + '''
-            function DumpMesh(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode) {                                          
+            function DumpMesh(pdir, pHeight, pWidth, pFontFactor, pFit, pName, pMode, pView) {                                          
                 var clsidMesh = 127; // mesh
                
                 var activeObjs = DS.Tree.AllObjects;
@@ -1185,15 +1199,15 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;        
                 DS.Graphics.RandomColors = false; 
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode);                             
+                saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode, pView);                             
                 DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode)
-        jsmain = 'DumpMesh("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), basename, mode, view)
+        jsmain = 'DumpMesh("{}", {}, {}, {}, {}, "{}", {}, {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1206,7 +1220,7 @@ class WBInterface(object):
             return False
         else: return True
        
-    def save_setups_view(self, container, fpath, fpref='Setup', width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_setups_view(self, container, fpath, fpref='Setup', width=0, height=0, fontfact=1, zoom_to_fit=True, view='iso', module='Model', ignore_js_err=True):
         """
         Saves all environments setups in png
         
@@ -1217,7 +1231,8 @@ class WBInterface(object):
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
-            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            zoom_to_fit: bool, set zoom to fit for pictures
+            view: int or 'iso, sets image view
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
@@ -1225,11 +1240,17 @@ class WBInterface(object):
             self._log_('Incorrect picture parameters!')
             return False
         
+        if view == 'iso': view = -1
+        elif not view: view = 0
+        elif not isinstance(view, int):
+            self._log_('Incorrect view identifier!', 1)
+            return False
+        
         self._log_('Saving all environment setups in {}'.format(fpath))      
         if not os.path.exists(fpath): os.makedirs(fpath)
         
         jsfun = self.__jsfun_savepics() + '''
-            function DumpSetups(pdir, pHeight, pWidth, pFontFactor, pFit, pPref) {                                          
+            function DumpSetups(pdir, pHeight, pWidth, pFontFactor, pFit, pPref, pView) {                                          
                 var clsidEnv = 105; // load cases
                
                 var activeObjs = DS.Tree.AllObjects;
@@ -1254,14 +1275,14 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = true;
                 DS.Script.beginWaitCursor();               
-                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0);
+                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0, pView);
                 DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''                        
-        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
-        jsmain = 'DumpSetups("{}", {}, {}, {}, {}, "{}");'.format(*args)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref, view)
+        jsmain = 'DumpSetups("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1275,7 +1296,7 @@ class WBInterface(object):
         else: return True
         
     # -------------------------------------------------------------------- 
-    def save_figures(self, container, fpath, fpref='Result', width=0, height=0, fontfact=1, zoom_to_fit=False, module='Model', ignore_js_err=True):
+    def save_figures(self, container, fpath, fpref='Result', width=0, height=0, fontfact=1, zoom_to_fit=False, view=0, module='Model', ignore_js_err=True):
         """
         Saves all figures (not plot!) in png
         
@@ -1286,12 +1307,19 @@ class WBInterface(object):
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             fontfact: float, increases legend size
-            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            zoom_to_fit: bool, set zoom to fit for pictures
+            view: int or 'iso, sets image view
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
         if width < 0 or height < 0 or fontfact < 0:
             self._log_('Incorrect picture parameters!')
+            return False
+        
+        if view == 'iso': view = -1
+        elif not view: view = 0
+        elif not isinstance(view, int):
+            self._log_('Incorrect view identifier!', 1)
             return False
         
         self._log_('Saving all figures in {}'.format(fpath))
@@ -1300,7 +1328,7 @@ class WBInterface(object):
 
         
         jsfun = self.__jsfun_savepics() + '''
-            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit, pPref) {                                          
+            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit, pPref, pView) {                                          
                 var clsidFigure = 147; // figures
                 
                 var activeObjs = DS.Tree.AllObjects;
@@ -1329,14 +1357,14 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = false;
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0);
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0, pView);
                 DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref)
-        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}");'.format(*args)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref, view)
+        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1349,7 +1377,7 @@ class WBInterface(object):
             return False
         else: return True
    # -------------------------------------------------------------------- 
-    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", frames=20, zoom_to_fit=False, module='Model', ignore_js_err=False):
+    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", frames=20, zoom_to_fit=True, view='iso', module='Model', ignore_js_err=False):
         """
         Saves all results animations with 'ani' in their name
         
@@ -1360,7 +1388,9 @@ class WBInterface(object):
             width: float; width of a picture, defaults to Workbench default
             height: float; height of a picture, defaults to Workbench default
             scale: animations scale factor
-            zoom_to_fit: bool, set isoview and zoom to fit for pictures
+            frames: int, number of frames in animation
+            zoom_to_fit: bool, set zoom to fit for pictures
+            view: int or 'iso, sets image view
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
@@ -1369,7 +1399,13 @@ class WBInterface(object):
         if width < 0 or height < 0 or not scale_arg:
             self._log_('Incorrect animation parameters!')
             return False   
-           
+            
+        if view == 'iso': view = -1
+        elif not view: view = 0
+        elif not isinstance(view, int):
+            self._log_('Incorrect view identifier!', 1)
+            return False     
+        
         self._log_('Saving all animations in {}'.format(fpath))
         
         if not os.path.exists(fpath): os.makedirs(fpath)
@@ -1449,7 +1485,7 @@ class WBInterface(object):
                 }
             }
             
-            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref){                              
+            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref, pView){                              
                 var clsidEnv = 105; // load cases
                 var clsidRes = 520; // results
 
@@ -1498,8 +1534,26 @@ class WBInterface(object):
                         DS.Graphics.LegendVisibility = true; 
                         DS.Graphics.RulerVisibility = false;
 
+                        if (!isNaN(pView)) {       		   
+                            switch(pView)
+                            {  
+                                case -1     :
+                                    DS.Graphics.setisoview(7);   
+                                    break;
+                                    
+                                case 0      :
+                                    break;
+                                    
+                                default     :
+                                    DS.Graphics.ModelViews.ApplyModelView(pView);
+                                    break;
+                            }
+                            DS.Graphics.Redraw(0);
+                        } 
+                        
+                        
                         if (pFit) {
-                            DS.Graphics.setisoview(7);
+                            //DS.Graphics.setisoview(7);
                             DS.Script.doGraphicsFit();     
                             DS.Graphics.RescaleAnnotation();
                             DS.Graphics.Redraw(1);
@@ -1535,8 +1589,8 @@ class WBInterface(object):
                 }
             }
         '''
-        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), frames, fpref)
-        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, {}, "{}");'.format(*args)
+        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), frames, fpref, view)
+        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, {}, "{}", {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1572,6 +1626,9 @@ class WBInterface(object):
             self._log_('Older ANSYS versions do not support this function!', 1)
             return False
         
+        try: unit_sys = unit_sys.upper()
+        except: pass
+        
         if unit_sys in ('MKS', 0): 
             unit_sys_id = 0
             unit_msg = 'Metric (m, kg, N, s, V, A)'
@@ -1596,11 +1653,11 @@ class WBInterface(object):
             unit_sys_id = 9
             unit_msg = 'Metric (um, kg, uN, s, V, mA)'
             
-        elif unit_sys in ('NMMton', 13): 
+        elif unit_sys in ('NMMTON', 13): 
             unit_sys_id = 13
             unit_msg = 'Metric (mm, t, N, s, mV, mA)'
             
-        elif unit_sys in ('NMMdat', 14): 
+        elif unit_sys in ('NMMDAT', 14): 
             unit_sys_id = 14
             unit_msg = 'Metric (mm, dat, N, s, mV, mA)'
             
@@ -1836,7 +1893,7 @@ class WBInterface(object):
         JS functions used to print pictures
         """
         return '''
-            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode){                              
+            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode, pView){                              
                 var numObjs = activeObjs.Count;
                 var image = DS.Graphics.ImageCaptureControl;
                 var clsidEnv = 105; // load cases
@@ -1860,8 +1917,25 @@ class WBInterface(object):
                     {
                         DS.Graphics.Draw2(objActive.ID);
                         
+                        if (!isNaN(pView)) {       		   
+                            switch(pView)
+                            {  
+                                case -1     :
+                                    DS.Graphics.setisoview(7);   
+                                    break;
+                                    
+                                case 0      :
+                                    break;
+                                    
+                                default     :
+                                    DS.Graphics.ModelViews.ApplyModelView(pView);
+                                    break;
+                            }
+                            DS.Graphics.Redraw(0);
+                        } 
+                                               
                         if (pFit) {
-                            DS.Graphics.setisoview(7);
+                            //DS.Graphics.setisoview(7);
                             DS.Script.doGraphicsFit();     
                             DS.Graphics.RescaleAnnotation();
                             DS.Graphics.Redraw(1);
