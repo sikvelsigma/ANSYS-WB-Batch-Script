@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.2'
+__version__ = '3.1.3'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.1.0'
+    __version__ = '3.1.1'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -841,6 +841,9 @@ class WBInterface(object):
         
     def move_from_userfiles(self, template_str, target):
         self.move_files(template_str, workbench.GetUserFilesDirectory() , target)
+        
+    def delete_from_userfiles(self, template_str):
+        self.delete_files(template_str, workbench.GetUserFilesDirectory())
         
     # ---------------------------------------------------------------
     # Messenger Methods 
@@ -2263,6 +2266,24 @@ class WBInterface(object):
                 filename = os.path.basename(f)
                 os.rename(f, os.path.join(target_dir, filename))
                 
+    @staticmethod            
+    def delete_files(template, source_dir):
+        """
+        Deletes files
+        
+        Args:
+            template: str, search files with this pattern
+            source_dir: str, source dir
+        """
+        srch_template = os.path.join(source_dir, template)
+        try:
+            srch = [f for f in glob(srch_template)]
+            f = srch[0]
+        except:
+            pass
+        else:
+            for f in srch: os.remove(f)
+    
     @staticmethod
     def _listify(inp):	
         """Returns list of 1 item if input is not a list"""
