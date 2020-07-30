@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.3'
+__version__ = '3.1.4'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.1.1'
+    __version__ = '3.1.2'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1491,6 +1491,7 @@ class WBInterface(object):
             function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref, pView){                              
                 var clsidEnv = 105; // load cases
                 var clsidRes = 520; // results
+                var clsidModel = 104; // model
 
                 var pExt = ".gif";
 
@@ -1567,15 +1568,21 @@ class WBInterface(object):
                         
                         try {
                             var objSearch = objActive.Parent;
-                            while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
+                            var objSearch2 = objActive.Parent;
+                            while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;    
+                            while (objSearch2.Class != clsidModel) objSearch2 = objSearch2.Parent;                                 
                             var nameSolution = (objSearch.Name).replace(/ |_/g, '-');
+                            var nameModel = (objSearch2.Name).replace(/ |_/g, '-');
                             nameSolution = nameSolution + "_";
+                            nameModel = nameModel + "_";
+                        
                         } 
                         catch (err) {
                             var nameSolution = "";
+                            var nameModel = "";
                         }
 
-                        nameFull = (pPref + "_" + picEnum + "_" + nameSolution + nameParent + pExt);
+                        nameFull = (pPref + "_" + picEnum + "_" + nameModel + nameSolution + nameParent + pExt);
 
                         doAnimationFilename(pdir + nameFull, pHeight, pWidth, pFrames);
 
@@ -1900,6 +1907,7 @@ class WBInterface(object):
                 var numObjs = activeObjs.Count;
                 var image = DS.Graphics.ImageCaptureControl;
                 var clsidEnv = 105; // load cases
+                var clsidModel = 104; // model
                 
                 switch (imode) 
                 {
@@ -1951,13 +1959,18 @@ class WBInterface(object):
                             
                             try {
                                 var objSearch = objActive.Parent;
-                                while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;                         
+                                var objSearch2 = objActive.Parent;
+                                while (objSearch.Class != clsidEnv) objSearch = objSearch.Parent;    
+                                while (objSearch2.Class != clsidModel) objSearch2 = objSearch2.Parent;                                 
                                 var nameSolution = (objSearch.Name).replace(/ |_/g, '-');
+                                var nameModel = (objSearch2.Name).replace(/ |_/g, '-');
                                 nameSolution = nameSolution + "_";
+                                nameModel = nameModel + "_";
                             } catch (err) {
                                 var nameSolution = "";
+                                var nameModel = "";
                             }
-                            nameFull = (pPref + "_" + picEnum + "_" + nameSolution + nameParent + "_" + nameFigure);
+                            nameFull = (pPref + "_" + picEnum + "_" + nameModel + nameSolution + nameParent + "_" + nameFigure);
                         } else {   
                             nameFull = pName;
                         } 
