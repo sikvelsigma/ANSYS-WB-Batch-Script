@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.4'
+__version__ = '3.1.5'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.1.2'
+    __version__ = '3.1.3'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1114,7 +1114,7 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;  
                 DS.Graphics.RandomColors = false;
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode, pView);                             
+                saveObjectsPictures(clsidModel, activeObjs, pdir, pName, "", pFit, pMode, pView, 0);                             
                 DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
@@ -1202,7 +1202,7 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;        
                 DS.Graphics.RandomColors = false; 
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode, pView);                             
+                saveObjectsPictures(clsidMesh, activeObjs, pdir, pName, "", pFit, pMode, pView, 0);                             
                 DS.Script.endWaitCursor();
                 
                 // ====Restore settings====              
@@ -1278,7 +1278,7 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = true;
                 DS.Script.beginWaitCursor();               
-                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0, pView);
+                saveObjectsPictures(clsidEnv, activeObjs, pdir, "", pPref, pFit, 0, pView, 0);
                 DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
@@ -1299,7 +1299,7 @@ class WBInterface(object):
         else: return True
         
     # -------------------------------------------------------------------- 
-    def save_figures(self, container, fpath, fpref='Result', width=0, height=0, fontfact=1, zoom_to_fit=False, view=0, module='Model', ignore_js_err=True):
+    def save_figures(self, container, fpath, fpref='Result', width=0, height=0, fontfact=1, zoom_to_fit=False, view=0, shade_mode='ShowUndeformedWireframe', module='Model', ignore_js_err=True):
         """
         Saves all figures (not plot!) in png
         
@@ -1312,8 +1312,14 @@ class WBInterface(object):
             fontfact: float, increases legend size
             zoom_to_fit: bool, set zoom to fit for pictures
             view: int or 'iso, sets image view
+            shade_mode: int or str; sets the shade mode
+                    'ShowNoWireframe' or 1
+                    'ShowUndeformedWireframe' or 2
+                    'ShowUndeformedModel' or 3
+                    'ShowElements' or 4
+                    'ShowWireframe' or 5
             module: str; module to open
-            ignore_js_err: bool; wraps js main cammands in a try block
+            ignore_js_err: bool; wraps js main cammands in a try block         
         """
         if width < 0 or height < 0 or fontfact < 0:
             self._log_('Incorrect picture parameters!')
@@ -1325,13 +1331,16 @@ class WBInterface(object):
             self._log_('Incorrect view identifier!', 1)
             return False
         
+        shade_mode = self._shade_mode_eval(shade_mode)
+
+        
         self._log_('Saving all figures in {}'.format(fpath))
         
         if not os.path.exists(fpath): os.makedirs(fpath)
 
         
         jsfun = self.__jsfun_savepics() + '''
-            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit, pPref, pView) {                                          
+            function DumpAllFigures(pdir, pHeight, pWidth, pFontFactor, pFit, pPref, pView, pWireMode) {                                          
                 var clsidFigure = 147; // figures
                 
                 var activeObjs = DS.Tree.AllObjects;
@@ -1360,14 +1369,14 @@ class WBInterface(object):
                 DS.Graphics.RulerVisibility = false;
                 DS.Graphics.RandomColors = false;
                 DS.Script.beginWaitCursor();
-                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0, pView);
+                saveObjectsPictures(clsidFigure, activeObjs, pdir, "", pPref, pFit, 0, pView, pWireMode);
                 DS.Script.endWaitCursor();
                 // ====Restore settings====              
                 postPicOutput(prevColor1, prevColor2, prevColor5, prevColor6, prevLegend, prevRuler, prevTriad, prevRandom)                         
             }
         '''
-        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref, view)
-        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}", {});'.format(*args)
+        args = (self._winpath_js(fpath), height, width, fontfact, self._bool_js(zoom_to_fit), fpref, view, shade_mode)
+        jsmain = 'DumpAllFigures("{}", {}, {}, {}, {}, "{}", {}, {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1380,7 +1389,7 @@ class WBInterface(object):
             return False
         else: return True
    # -------------------------------------------------------------------- 
-    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", frames=20, zoom_to_fit=True, view='iso', module='Model', ignore_js_err=False):
+    def save_animations(self, container, fpath, fpref='Animation', width=0, height=0, scale="auto", frames=20, zoom_to_fit=True, view='iso', shade_mode='ShowWireframe', module='Model', ignore_js_err=False):
         """
         Saves all results animations with 'ani' in their name
         
@@ -1394,6 +1403,12 @@ class WBInterface(object):
             frames: int, number of frames in animation
             zoom_to_fit: bool, set zoom to fit for pictures
             view: int or 'iso, sets image view
+            shade_mode: int or str; sets the shade mode
+                    'ShowNoWireframe' or 1
+                    'ShowUndeformedWireframe' or 2
+                    'ShowUndeformedModel' or 3
+                    'ShowElements' or 4
+                    'ShowWireframe' or 5
             module: str; module to open
             ignore_js_err: bool; wraps js main cammands in a try block
         """
@@ -1409,11 +1424,13 @@ class WBInterface(object):
             self._log_('Incorrect view identifier!', 1)
             return False     
         
+        shade_mode = self._shade_mode_eval(shade_mode)
+        
         self._log_('Saving all animations in {}'.format(fpath))
         
         if not os.path.exists(fpath): os.makedirs(fpath)
         
-        jsfun = self.__jsfun_setscale() + '''
+        jsfun = self.__jsfun_setscale() + self.__jsfun_edgeproc() + '''
             function doAnimationFilename(fName, pHeight, pWidth, pFrames)
             {
                 var avi = /.avi$/i;   // $=end of string,  i=case insensitive
@@ -1488,7 +1505,7 @@ class WBInterface(object):
                 }
             }
             
-            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref, pView){                              
+            function saveAnimation(pdir, pHeight, pWidth, pScale, pFit, pFrames, pPref, pView, pWireMode){                              
                 var clsidEnv = 105; // load cases
                 var clsidRes = 520; // results
                 var clsidModel = 104; // model
@@ -1563,6 +1580,42 @@ class WBInterface(object):
                             DS.Graphics.Redraw(1);
                         }
                         
+                        switch(pWireMode)
+                        {  
+                            case 1      :
+                                doEdgeProcessing(0)
+                                //DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 2      :
+                                doEdgeProcessing(1)
+                                //DS.Script.doUndeformedWireFrameResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 3      :
+                                doEdgeProcessing(2)
+                                //DS.Script.doUndeformedModelResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 4      :
+                                doEdgeProcessing(3)
+                                //DS.Script.doElementsResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 5      :
+                                doEdgeProcessing(0)
+                                DS.Script.doViewWireframe();
+                                break;
+                                
+                            default     :
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                        }
+                        
+                        DS.Graphics.Redraw(1);
                         var picEnum = ("00" + cntFigures).slice (-3);
                         var nameParent = (objActive.Name).replace(/ |_/g, '-');
                         
@@ -1599,8 +1652,8 @@ class WBInterface(object):
                 }
             }
         '''
-        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), frames, fpref, view)
-        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, {}, "{}", {});'.format(*args)
+        args = (self._winpath_js(fpath), height, width, scale_arg, self._bool_js(zoom_to_fit), frames, fpref, view, shade_mode)
+        jsmain = 'saveAnimation("{}", {}, {}, {}, {}, {}, "{}", {}, {});'.format(*args)
         
         if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
         else: jscode = jsfun + jsmain
@@ -1897,13 +1950,12 @@ class WBInterface(object):
             }
         '''
     # -------------------------------------------------------------------- 
-    @staticmethod
-    def __jsfun_savepics():
+    def __jsfun_savepics(self):
         """
         JS functions used to print pictures
         """
-        return '''
-            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode, pView){                              
+        return self.__jsfun_edgeproc() + '''
+            function saveObjectsPictures(clsidObj, activeObjs, pdir, pName, pPref, pFit, imode, pView, pWireMode){                              
                 var numObjs = activeObjs.Count;
                 var image = DS.Graphics.ImageCaptureControl;
                 var clsidEnv = 105; // load cases
@@ -1928,6 +1980,41 @@ class WBInterface(object):
                     {
                         DS.Graphics.Draw2(objActive.ID);
                         
+                        switch(pWireMode)
+                        {  
+                            case 1      :
+                                doEdgeProcessing(0)
+                                //DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 2      :
+                                doEdgeProcessing(1)
+                                //DS.Script.doUndeformedWireFrameResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 3      :
+                                doEdgeProcessing(2)
+                                //DS.Script.doUndeformedModelResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 4      :
+                                doEdgeProcessing(3)
+                                //DS.Script.doElementsResultView();
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                                
+                            case 5      :
+                                doEdgeProcessing(0)
+                                DS.Script.doViewWireframe();
+                                break;
+                                
+                            default     :
+                                DS.Script.doViewShadedSurfacesEdges();
+                                break;
+                        }
+                        
                         if (!isNaN(pView)) {       		   
                             switch(pView)
                             {  
@@ -1951,7 +2038,8 @@ class WBInterface(object):
                             DS.Graphics.RescaleAnnotation();
                             DS.Graphics.Redraw(1);
                         }
-                        
+                           
+
                         if (!pName) {
                             var picEnum = ("00" + cntFigures).slice (-3);
                             var nameParent = (objActive.Parent.Name).replace(/ |_/g, '-');
@@ -2024,7 +2112,30 @@ class WBInterface(object):
                 DS.Graphics.GfxUtility.Legend.IsImgResEnhanced = 0;
                 DS.Graphics.Info(gr_ImgResEnhanced) = 0;
                 DS.Graphics.StreamMode = 0;  //so the geometry view will become visible again                                  
-            }           
+            }  
+            
+        '''
+    # -------------------------------------------------------------------- 
+    @staticmethod
+    def __jsfun_edgeproc():
+        """
+        JS functions used to change view type
+        """
+        return '''
+        function doEdgeProcessing(edgeType)
+            {
+                //0=NoWireFrame, 1=ShowUndeformedWireFrame, 2=ShowUndeformedModel, 3=ShowElements, 4=notUsed
+                var prefs;
+                prefs = DS.Graphics.ResultPrefs;
+                var flag = 0x10;//enumWBWireframeExtended;
+                if (prefs.edgeDisplay & flag)
+                    prefs.edgeDisplay = (edgeType | flag);
+                else
+                    prefs.edgeDisplay = edgeType;
+                prefs.update();
+                DS.Graphics.Info(DS.Script.id_PostPreferencesChanged) = 1;
+                DS.Graphics.Redraw(1);
+            }
         '''
     # -------------------------------------------------------------------- 
     def send_js_macro(self, system, macro, component='Model', gui=False):
@@ -2106,6 +2217,21 @@ class WBInterface(object):
                 self._log_('Incorrect scale!')
                 return False, False
         return arg, msg
+        
+        # -------------------------------------------------------------------- 
+    def _shade_mode_eval(self, mode):
+        """Converts shade mode value to pass onto JS"""
+        try: mode = mode.lower()
+        except: pass
+        
+        if mode in ('shownowireframe', 1): res = 1
+        elif mode in ('showundeformedwireframe', 2): res = 2
+        elif mode in ('showundeformedmodel', 3): res = 3
+        elif mode in ('showelements', 4): res = 4
+        elif mode in ('showwireframe', 5): res = 5
+        else: res = 0
+        
+        return res
     # -------------------------------------------------------------------- 
     def _clear_DPs(self):
         """Delete pre-existing Design Points"""
