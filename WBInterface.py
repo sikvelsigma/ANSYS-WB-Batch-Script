@@ -50,7 +50,7 @@ log_module = find_module('Logger')
 print('WBInterface| Using: {}'.format(log_module))
 if log_module: exec('from {} import Logger'.format(log_module))
 
-__version__ = '3.1.5'
+__version__ = '3.1.6'
 #__________________________________________________________
 class WBInterface(object):
     """
@@ -72,7 +72,7 @@ class WBInterface(object):
         Use method log() to write into a log file (see Logger class)
         Use method blank() to write a blank line
     """
-    __version__ = '3.1.3'
+    __version__ = '3.1.4'
     
     _macro_def_dir = '_TempScript'
     __macro_dir_path = ''
@@ -1815,7 +1815,26 @@ class WBInterface(object):
             self._log_(err_msg, 1) 
             return False
         else: return True
-               
+    # -------------------------------------------------------------------- 
+           
+    def show_all_bodies(self, container, module='Model', ignore_js_err=True):
+
+        self._log_('Show all hidden bodies')
+        
+        jsfun = ''
+        
+        jsmain = '''DS.Script.doShowAllParts();'''
+        
+        if ignore_js_err: jscode = jsfun + self._try_wrapper_js(jsmain)
+        else: jscode = jsfun + jsmain
+         
+        try:
+            self._send_js_macro(container, jscode, module, visible=True)
+        except Exception as err_msg:
+            self._log_('An error occured!')
+            self._log_(err_msg, 1) 
+            return False
+        else: return True
     # -------------------------------------------------------------------- 
     def send_act_macro(self, sys, code, ext='py', comp='Model'): 
         """
