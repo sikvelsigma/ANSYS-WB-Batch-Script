@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """ Script by Toybich Egor
 """
-#__________________________________________________________
-#__________________________________________________________
 from glob import glob 
 import sys
 import platform
 import os
 
+#===========================================================================
+#======= This block imports framework files ================================
+#===========================================================================
 def find_module(st_in):
     res = []
     stlist = st_in if isinstance(st_in, list) else [st_in]
@@ -33,6 +34,8 @@ if modules_files[1]: exec('from {} import ExcelFileReader'.format(modules_files[
 if modules_files[2]: exec('from {} import Logger'.format(modules_files[2]))
 if modules_files[3]: exec('import {} as CSVTable'.format(modules_files[3]))
 #===========================================================================
+#===========================================================================
+#===========================================================================
 
 if __name__ == '__main__':
     filepath = os.path.abspath(__file__)
@@ -48,15 +51,14 @@ if __name__ == '__main__':
     try:
         wb.open_any(archive_first=True)
         wb.find_and_import_parameters()
-        
         #----------------------------------------------------------------
         # Parameters can be imported directly
         # input_p = {'p1':[1, 2, 3], 'p2':[10, 20, 30]}
         # wb.input_by_name(input_p)
+        # wb.import_parameters()
+        
         # output_p = ['p1', 'p3', 'p4']
         # wb.set_output(output_p)
-        
-        # wb.import_parameters()
         #============================================================================== 
         # Sets maximum number of cores
         # wb.set_cores_number('SYS')   
@@ -73,13 +75,14 @@ if __name__ == '__main__':
         #============================================================================== 
         # Set figure scale 
         # wb.set_figures_scale('SYS', scale='auto') 
+        # wb.show_all_bodies('SYS')
         
         # Picture parameters
         # overview_args = dict(width=1920, height=1080, zoom_to_fit=True, view='iso')
         # mesh_args = dict(width=1920*2, height=1080*2, zoom_to_fit=True, view='iso')
         # env_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.5, view='iso')
-        # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35, view='iso')
-        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto', frames=20, view='iso')
+        # fig_args = dict(width=1920, height=1080, zoom_to_fit=True, fontfact=1.35, view='iso', shade_mode='ShowWireframe')
+        # ani_args = dict(width=1920/2, height=1080/2, zoom_to_fit=True, scale='auto', frames=20, view='iso', shade_mode='ShowWireframe')
         
         
         # Save pictures parameters
